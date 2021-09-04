@@ -36,7 +36,7 @@
 | :--------------------------------: | :------------------------------------------------- |
 |      [bases](#basesモジュールのクラス)      | バリデータ、コンバータの基底クラスが定義されている<br>自作のバリデータを定義するときに使用できる |
 | [validators](#validatorsモジュールのクラス) | バリデータが定義されている                                      |
-| [convertors](#convertorsモジュールのクラス) | コンバータが定義されている                                      |
+| [converters](#convertersモジュールのクラス) | コンバータが定義されている                                      |
 
 ### basesモジュールのクラス
 
@@ -44,7 +44,7 @@
 | :--------: | :------------------------------------------------------------------------------------ |
 |  Validator | すべてのバリデータ、コンバータの基底クラス                                                                 |
 | VContainer | コンテナ用のバリデータの基底クラス<br>中身が可変なクラスのバリデータを定義するときに使用する                                      |
-|  Convertor | コンバータの基底クラス<br>セキュアさが重視される場面では使用しない                                                   |
+|  Converter | コンバータの基底クラス<br>セキュアさが重視される場面では使用しない                                                   |
 | CNumerical | 数値型用コンバータの基底クラス<br>`value`に対し、`int`変換、`float`変換を試みるメソッドが定義されている<br>`complex`は想定されていない |
 
 ### validatorsモジュールのクラス
@@ -65,18 +65,18 @@
 |  VList  | VContainer | 適切なリストか            |     list     |
 |  VTuple |  VContaner | 適切なタプルか            |     tuple    |
 
-### convertorsモジュールのクラス
+### convertersモジュールのクラス
 
-スーパークラスにコンバータが記載されていないクラスは`Convertor`を継承しています。
+スーパークラスにコンバータが記載されていないクラスは`Converter`を継承しています。
 
 |   クラス   |       スーパークラス       | 概要                                                                                             |
 | :-----: | :-----------------: | :--------------------------------------------------------------------------------------------- |
-|  CBool  |   VBool, Convertor  | 一般に**Yes/Noとして解釈できる値**に対し、bool変換を試み、検証を行う<br>`bool(value)`では`True`になるものが`False`になったり例外が発生したりする |
+|  CBool  |   VBool, Converter  | 一般に**Yes/Noとして解釈できる値**に対し、bool変換を試み、検証を行う<br>`bool(value)`では`True`になるものが`False`になったり例外が発生したりする |
 | CNumber | VNumber, CNumerical | `int`, `float`型への変換を試み、検証を行う                                                                   |
 |  CFloat |  VFloat, CNumerical | `float`型への変換を試み、検証を行う                                                                          |
 |   CInt  |   VInt, CNumerical  | `int`型への変換を試み、検証を行う                                                                            |
-|  CPath  |   VPath, Convertor  | `Path`型への変換を試み、検証を行う                                                                           |
-| CString |  VString, Convertor | `str`型への変換を試み、検証を行う                                                                            |
+|  CPath  |   VPath, Converter  | `Path`型への変換を試み、検証を行う                                                                           |
+| CString |  VString, Converter | `str`型への変換を試み、検証を行う                                                                            |
 
 ## 継承規則
 
@@ -84,7 +84,7 @@
 
 -   [Validator継承規則](#validator継承規則)
 -   [VContainer継承規則](#vcontainer継承規則)
--   [Convertor継承規則](#convertor継承規則)
+-   [Converter継承規則](#converter継承規則)
 
 ### Validator継承規則
 
@@ -104,7 +104,7 @@
 |  定義 | `validate`メソッドを定義し、検証が通った場合には`value`を返す<br>変換を許可する場合、`TEMPLATE`が`Validator`以外の場合など細かな違いを設定する必要がある | コンテナそのものの検証と中身の検証が必要                            |
 |  変換 | `value`の型を変換しない<br>`value`の各要素`v`に対してはオプション次第                                                     | `TEMPLATE`にコンバータを渡している場合、禁止されていない限り変換を行うのが自然なため |
 
-### Convertor継承規則
+### Converter継承規則
 
 `CNumerical`についてもここに従ってください。
 

@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 from typing import Any, Callable, Optional, Union, cast, overload
 
-from otsuvalidator.bases import Convertor, Validator, VContainer
+from otsuvalidator.bases import Converter, Validator, VContainer
 
 
 class VBool(Validator):
@@ -215,7 +215,7 @@ class VDict(VContainer):
             tv = self.TEMPLATE.get(k)
             if isinstance(tv, Validator):
                 try:
-                    if isinstance(tv, Convertor):
+                    if isinstance(tv, Converter):
                         if self.allow_convert:
                             value[k] = tv.validate(v)
                         else:
@@ -292,10 +292,10 @@ class VList(VContainer):
         return value
 
     def _validate_by_validator(self, value) -> list:
-        T = cast(Union[Validator, Convertor], self.TEMPLATE)
+        T = cast(Union[Validator, Converter], self.TEMPLATE)
         for i, v in enumerate(value):
             try:
-                if isinstance(T, Convertor):
+                if isinstance(T, Converter):
                     if self.allow_convert:
                         value[i] = T.validate(v)
                     else:
@@ -319,7 +319,7 @@ class VList(VContainer):
         for i, (v, validator) in enumerate(zip(value, self.TEMPLATE)):
             if isinstance(validator, Validator):
                 try:
-                    if isinstance(validator, Convertor):
+                    if isinstance(validator, Converter):
                         if self.allow_convert:
                             value[i] = validator.validate(v)
                         else:
@@ -412,7 +412,7 @@ class VTuple(VContainer):
     def _validate_by_validator(self, value) -> tuple:
         if self.allow_convert:
             return self._validate_by_validator_allow(value)
-        if isinstance(self.TEMPLATE, Convertor):
+        if isinstance(self.TEMPLATE, Converter):
             validate = self.TEMPLATE.super_validate
         else:
             validate = self.TEMPLATE.validate
@@ -426,7 +426,7 @@ class VTuple(VContainer):
         return value
 
     def _validate_by_validator_allow(self, value) -> tuple:
-        self.TEMPLATE = cast(Union[Validator, Convertor], self.TEMPLATE)
+        self.TEMPLATE = cast(Union[Validator, Converter], self.TEMPLATE)
         res = []
         for i, v in enumerate(value):
             try:
@@ -450,7 +450,7 @@ class VTuple(VContainer):
         for i, (v, validator) in enumerate(zip(value, self.TEMPLATE)):
             if isinstance(validator, Validator):
                 try:
-                    if isinstance(validator, Convertor):
+                    if isinstance(validator, Converter):
                         validator.super_validate(v)
                     else:
                         validator.validate(v)
@@ -479,7 +479,7 @@ class VTuple(VContainer):
         for i, (v, validator) in enumerate(zip(value, self.TEMPLATE)):
             if isinstance(validator, Validator):
                 try:
-                    if isinstance(validator, Convertor):
+                    if isinstance(validator, Converter):
                         v = validator.validate(v)
                     else:
                         validator.validate(v)

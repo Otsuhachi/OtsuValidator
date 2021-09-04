@@ -80,7 +80,7 @@ class VContainer(Validator):
         return res
 
 
-class Convertor(Validator):
+class Converter(Validator):
     """すべてのコンバータの基底クラスです。
 
     バリデータとこのクラスを継承してsuper_validateメソッドを定義してください。
@@ -101,13 +101,13 @@ class Convertor(Validator):
         pass
 
 
-class CNumerical(Convertor):
+class CNumerical(Converter):
     """数値型用コンバータの基底クラスです。
 
     (int, float)に変換を試みるメソッドが定義されています。
 
     Args:
-        Convertor ([type]): [description]
+        Converter ([type]): [description]
     """
     @staticmethod
     def try_int(value: Any) -> Optional[int]:

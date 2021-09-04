@@ -1,11 +1,11 @@
 from pathlib import Path
 from typing import Any, Callable, Optional, Tuple, Union, cast, overload
 
-from .bases import CNumerical, Convertor
+from .bases import CNumerical, Converter
 from .validators import VBool, VFloat, VInt, VNumber, VPath, VString
 
 
-class CBool(VBool, Convertor):
+class CBool(VBool, Converter):
     """VBoolの拡張バリデータです。
     
     一般にYes/Noとして解釈できる値に対し、bool変換を試みます。
@@ -173,7 +173,7 @@ class CInt(VInt, CNumerical):
         return super().validate(value)
 
 
-class CPath(VPath, Convertor):
+class CPath(VPath, Converter):
     """VPathの拡張バリデータです。
 
     Path型に変換可能なオブジェクトは例外を投げずに変換を行います。
@@ -190,7 +190,7 @@ class CPath(VPath, Convertor):
         return super().validate(value)
 
 
-class CString(VString, Convertor):
+class CString(VString, Converter):
     """VStringの拡張バリデータです。
 
     str型に変換可能なオブジェクトは例外を投げずに変換を行います。
