@@ -161,7 +161,7 @@ class VRegex(VString):
     """
     pattern = VString()
 
-    def __init__(self, pattern: str, minimum: Optional[int], maximum: Optional[int], checker: Optional[Callable[[str], bool]]):
+    def __init__(self, pattern: str, minimum: Optional[int] = None, maximum: Optional[int] = None, checker: Optional[Callable[[str], bool]] = None):
         """正規表現、最低文字数、最大文字数、確認関数を設定してバリデータを生成します。
 
         Args:

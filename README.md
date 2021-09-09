@@ -6,12 +6,12 @@
 
 # 概要
 
-このライブラリは値の正常性を検証するバリデータ群と、検証前に型変換を試みるコンバータ群です。
-ディスクリプタとして使用することで属性に不正な値が代入されるのを防止します。
-また、単独で使用することも可能です。
+このライブラリは値の正常性を検証するバリデータ群と、検証前に型変換を試みるコンバータ群です。  
+ディスクリプタとして使用することで属性に不正な値が代入されるのを防止します。  
+また、単独で使用することも可能です。  
 
-このライブラリは以下の環境で作成されています。
-`Windows10(64bit)`, `Python3.8`
+このライブラリは以下の環境で作成されています。  
+`Windows10(64bit)`, `Python3.8`  
 **`:=演算子`を使用しているので、3.8以前のバージョンでは使えません。**
 
 ## インストール
@@ -40,11 +40,14 @@
 
 ### basesモジュールのクラス
 
+`Validator`と表記されている部分に関しては、バリデータ、コンバータ両方を指します。
+
 |     クラス    | 概要                                                                                    |
 | :--------: | :------------------------------------------------------------------------------------ |
 |  Validator | すべてのバリデータ、コンバータの基底クラス                                                                 |
 | VContainer | コンテナ用のバリデータの基底クラス<br>中身が可変なクラスのバリデータを定義するときに使用する                                      |
 |  Converter | コンバータの基底クラス<br>セキュアさが重視される場面では使用しない                                                   |
+CNoneable|`Validator`既定のバリデーションに加え、`None`を許可する<br>変換の可否は以下の2点に依存する<br>- 渡した`Validator`がコンバータか否か<br>- 所属する`VContainer`の`allow_convert`オプション
 | CNumerical | 数値型用コンバータの基底クラス<br>`value`に対し、`int`変換、`float`変換を試みるメソッドが定義されている<br>`complex`は想定されていない |
 
 ### validatorsモジュールのクラス
@@ -80,7 +83,8 @@
 
 ## 継承規則
 
-きちんと動作するバリデータ、コンバータを定義するために規則です。
+きちんと動作するバリデータ、コンバータを定義するために規則です。  
+`CNoneable`は**継承しないでください。**
 
 -   [Validator継承規則](#validator継承規則)
 -   [VContainer継承規則](#vcontainer継承規則)
@@ -126,6 +130,10 @@
 - [ageの操作](#バリデータ実行例-ageの操作)
 - [genderの操作](#バリデータ実行例-genderの操作)
 - [gradesの操作](#バリデータ実行例-gradesの操作)
+- [hobbyの操作](#バリデータ実行例-hobbyの操作)
+- [addressの操作](#バリデータ実行例-addressの操作)
+- [成功](#バリデータ実行例-成功)
+
 #### バリデータ実行例-前提コード
 
 [目次](#バリデータの実行例目次)に戻る
@@ -138,7 +146,7 @@
 
 ```python
 # test.py
-from otsuvalidator import VChoice, VDict, VInt, VString
+from otsuvalidator import (CNoneable, VChoice, VDict, VInt, VList, VRegex, VString)
 
 
 class Student:
@@ -166,6 +174,10 @@ class Student:
         allow_missing_key=False,
         monitoring_overwrite=False,
     )
+    # 1文字以上の文字列だけのリスト Noneで無回答可 要素数は無制限
+    hobby = CNoneable(VList(VString(1)))
+    # [郵便番号, 都道府県, 市町村群]のリスト Noneで無回答可
+    address = CNoneable(VList([VRegex('^\\d{3}-?\\d{4}$'), VRegex('(?!.*\\d.*)'), VRegex('(?!.*\\d.*)')]))
 
     def show_profile(self):
         name = self.name
@@ -175,8 +187,10 @@ class Student:
         japanese = grades['Japanese']
         social = grades['Social Studies']
         math = grades['Math']
-        profiles = ('名前', '年齢', '性別', '国語', '社会', '数学')
-        profile_values = (name, age, gender, japanese, social, math)
+        hobby = self.hobby
+        address = self.address
+        profiles = ('名前', '年齢', '性別', '国語', '社会', '数学', '趣味', '住所')
+        profile_values = (name, age, gender, japanese, social, math, hobby, address)
         for title, value in zip(profiles, profile_values):
             print(f'{title}: {value}')
 
@@ -188,7 +202,7 @@ otsuhachi = Student()
 
 [目次](#バリデータの実行例目次)に戻る
 
-`otsuhachi.name`を操作します。
+`otsuhachi.name`を操作します。  
 `Student`の`name`属性は`VString(1, checker=str.istitle)`によって検証されます。
 
 ```python
@@ -227,7 +241,7 @@ ValueError: 属性'name'は指定した形式に対応している必要があ�
 
 [目次](#バリデータの実行例目次)に戻る
 
-`otsuhachi.age`を操作します。
+`otsuhachi.age`を操作します。  
 `Student`の`age`属性は`VInt(0)`によって検証されます。
 
 ```python
@@ -259,7 +273,7 @@ ValueError: 属性'age'は150より大きい値を設定することはできま
 
 [目次](#バリデータの実行例目次)に戻る
 
-`otsuhachi.gender`を操作します。
+`otsuhachi.gender`を操作します。  
 `Student`の`gender`属性は`VChoice('male', 'female', 'others')`によって検証されます。
 
 
@@ -298,7 +312,7 @@ ValueError: 属性'gender'は{'male', 'others', 'female'}のいずれかであ�
 - [gradesで起こりえる不正](#gradesで起こりえる不正)
 - [gradesで起こりえる不正の防止](#gradesで起こりえる不正の防止)
 
-`otsuhachi.garades`を操作します。
+`otsuhachi.garades`を操作します。  
 `Student`の`grades`は以下のように定義されたバリデータによって検証されます。
 
 ```python
@@ -324,7 +338,7 @@ VDict(
 ##### gradesの概要
 
 
-一見複雑ですので分解して考えてみます。
+分解して考えてみます。
 
 - gradesが持つべきキーは(`Japanese`, `Social Studies`, `Math`)の3つ
    - `Japanese`と`Social Studies`は`0～100`の整数値
@@ -402,7 +416,7 @@ ValueError: 属性'grades'は以下のキーを設定することはできませ
 
 ##### gradesで起こりえる不正
 
-この設定では書き換えに対して無力です。
+この設定では書き換えに対して無力です。  
 `otsuhachi.grades`が呼び出されたとき限定で検証が行われるので、以下のような操作では不正が行えます。
 
 ```python
@@ -425,10 +439,10 @@ ValueError: 属性'grades'は以下のキーを設定することはできませ
 1. バリデータをクラス外で定義し、必要に応じて検証を行う
 2. `monitoring_overwrite`を`True`にする
 
-1.の方法では手間が掛かりますが、不要な時に検証されることがないので比較的高速な動作が期待されます。
-また`monitoring_overwrite`は`False`でなければ2の方法と変わりありません。
+1.の方法では手間が掛かりますが、不要な時に検証されることがないので比較的高速な動作が期待されます。  
+また`monitoring_overwrite`は`False`でなければ2の方法と変わりありません。  
 
-2.の方法では`otsuhachi.grades`が呼ばれるたびに検証されるので手軽です。
+2.の方法では`otsuhachi.grades`が呼ばれるたびに検証されるので手軽です。  
 
 どちらも書き換えは許してしまいますが、最終的に値を利用するタイミングでは検証が行われます。
 
@@ -513,4 +527,146 @@ During handling of the above exception, another exception occurred:
 Traceback (most recent call last):
 ...
 TypeError: キー'Math'は不正な値です。(66: int)
+```
+
+#### バリデータ実行例-hobbyの操作
+
+[目次](#バリデータの実行例目次)に戻る
+
+`otsuhachi.hobby`を操作します。  
+`Student`の`hobby`属性は`CNoneable(VList(VString(1)))`によって検証されます。
+
+`CNoneable`はバリデータに`None`を許可するクラスです。  
+今回は`otsuhachi.hobby`が`None`または`VList(VString(1))`の条件を満たす時に検証を通過します。
+
+```python
+
+# 失敗 (CNoneableはNoneを許可するだけで、初期値をNoneにはしない)
+>>> otsuhachi.hobby
+Traceback (most recent call last):
+...
+AttributeError: 'Student' object has no attribute '_hobby'
+
+# 失敗 (不正な値)
+>>> otsuhachi.hobby = 1
+Traceback (most recent call last):
+...
+TypeError: list型である必要があります。(1: int)
+
+# 失敗 (リスト内の値が不正)
+>>> otsuhachi.hobby = [1]
+Traceback (most recent call last):
+...
+TypeError: str型である必要があります。(1: int)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+...
+TypeError: インデックス0は不正な値です。(1: int)
+
+# 成功
+>>> otsuhachi.hobby = None
+>>> print(otsuhachi.hobby)
+None
+
+# 成功
+>>> otsuhachi.hobby = ['PC', 'game']
+>>> otsuhachi.hobby
+['PC', 'game']
+
+# 失敗 (不正な値を追加後に参照)
+>>> otsuhachi.hobby.append(1)
+>>> otsuhachi.hobby
+Traceback (most recent call last):
+...
+TypeError: str型である必要があります。(1: int)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+...
+TypeError: インデックス2は不正な値です。(1: int)
+```
+
+
+#### バリデータ実行例-addressの操作
+
+[目次](#バリデータの実行例目次)に戻る
+
+`otsuhachi.address`を操作します。  
+`Student`の`address`属性は`CNoneable(VList([VRegex('^\\d{3}-?\\d{4}$'), VRegex('(?!.*\\d.*)')`によって検証されます。  
+基本的な失敗例、成功例は[hobby](#バリデータ実行例-hobbyの操作)を参照してください。  
+`address`属性の特殊な点は`VList`の`TEMPLATE`が`list型`である点です。  
+
+`value[i]`が`TEMPLATE[i]`でそれぞれ検証されます。
+
+```python
+
+# 失敗 (要素数が足りていない)
+>>> otsuhachi.address = []
+Traceback (most recent call last):
+...
+ValueError: あと3個設定する必要があります。([]: list)
+
+# 失敗 (要素数が多い)
+>>> otsuhachi.address = ['', '', '', '']
+Traceback (most recent call last):
+...
+ValueError: あと1個減らす必要があります。(['', '', '', '']: list)
+
+# 失敗 (不正な値)
+>>> otsuhachi.address = ['0000000000', 'Otsu Prefecture2', 'OtsuCity']
+Traceback (most recent call last):
+...
+ValueError: 正規表現'^\\d{3}-?\\d{4}$'に対応している必要があります。('0000000000': str)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+...
+ValueError: インデックス0は不正な値です。('0000000000': str)
+
+# 失敗 (不正な値)
+>>> otsuhachi.address = ['282-2828', 'Otsu Prefecture2', 'OtsuCity']
+Traceback (most recent call last):
+...
+ValueError: 正規表現'(?!.*\\d.*)'に対応している必要があります。('Otsu Prefecture2': str)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+...
+ValueError: インデックス1は不正な値です。('Otsu Prefecture2': str)
+
+
+# 成功
+>>> otsuhachi.address = ['282-2828', 'Otsu Prefecture', 'OtsuCity']
+>>> otsuhachi.address
+['282-2828', 'Otsu Prefecture', 'OtsuCity']
+```
+
+#### バリデータ実行例-成功
+
+[目次](#バリデータの実行例目次)に戻る
+
+すべてのバリデータでの検証が終われば、設計通りにクラスが動作します。
+
+```python
+
+>>> otsuhachi.name = 'Otsuhachi'
+>>> otsuhachi.age = 28
+>>> otsuhachi.gender = 'male'
+>>> otsuhachi.grades = {'Japanese': 68, 'Social Studies': 28, 'Math': {'Math1': 66, 'Math2': 56}}
+>>> otsuhachi.hobby = ['PC', 'game']
+>>> otsuhachi.address = ['282-2828', 'Otsu Prefecture', 'OtsuCity']
+>>> otsuhachi.show_profile()
+名前: Otsuhachi
+年齢: 28
+性別: male
+国語: 68
+社会: 28
+数学: {'Math1': 66, 'Math2': 56}
+趣味: ['PC', 'game']
+住所: ['282-2828', 'Otsu Prefecture', 'OtsuCity']
 ```

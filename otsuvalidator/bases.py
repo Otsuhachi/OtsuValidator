@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 
 class Validator(ABC):
@@ -99,6 +99,58 @@ class Converter(Validator):
             Any: 検証を通過した値です。
         """
         pass
+
+
+class CNoneable(Converter):
+    """バリデータまたはコンバータにNoneを含めることを許可するクラスです。
+    """
+    def __init__(self, validator: Union[Validator, Converter], monitoring_overwrite: bool = True):
+        """バリデータ、コンバータのインスタンスを渡し、追加でNoneを許可するようにします。
+
+        Args:
+            validator (Union[Validator, Converter]): バリデータまたはコンバータです。
+            monitoring_overwrite (bool, optional): アクセス時に再検証を行うかどうかです。要素数などによっては時間がかかる場合があります。不変であることが保証されている場合には無効にしてください。
+        """
+        self.validator = validator
+        self.monitoring_overwrite = monitoring_overwrite
+
+    def __get__(self, instance, otype):
+        res = super().__get__(instance, otype)
+        if res is None:
+            return res
+        if getattr(self.validator, 'monitoring_overwrite', None):
+            res = self.validator.validate(res)
+        return res
+
+    def validate(self, value: Any) -> Any:
+        """Noneを通し、それ以外を本来のvalidator.validateを使用して検証を行います。
+
+        Args:
+            value (Any): 検証する値です。
+
+        Returns:
+            Any: 検証を通過した値です。
+        """
+        if value is None:
+            return None
+        return self.validator.validate(value)
+
+    def super_validate(self, value: Any) -> Any:
+        """Noneを通し、それ以外を本来のvalidator.super_validateを使用して検証を行います。
+
+        validatorがコンバータでない場合、validator.validateを使用して検証を行います。
+
+        Args:
+            value (Any): 検証する値です。
+
+        Returns:
+            Any: 検証を通過した値です。
+        """
+        if value is None:
+            return None
+        if isinstance(self.validator, Converter):
+            return self.validator.super_validate(value)
+        self.validator.validate(value)
 
 
 class CNumerical(Converter):
