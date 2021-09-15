@@ -184,6 +184,7 @@ class CPath(VPath, Converter):
                 value = Path(value)
             except:
                 msg = self.ERRMSG('Path型として扱える必要があります', value)
+                raise TypeError(msg)
         return super().validate(value)
 
     def super_validate(self, value: Any) -> Path:
@@ -201,6 +202,7 @@ class CString(VString, Converter):
                 value = str(value)
             except:
                 msg = self.ERRMSG('str型として扱える必要があります', value)
+                raise TypeError(msg)
         return super().validate(value)
 
     def super_validate(self, value: Any) -> str:
