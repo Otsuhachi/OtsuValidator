@@ -1,8 +1,11 @@
+import re
+
+from datetime import timedelta
 from pathlib import Path
 from typing import Any, Callable, Optional, Tuple, Union, cast, overload
 
 from .bases import CNumerical, Converter
-from .validators import VBool, VFloat, VInt, VNumber, VPath, VString
+from .validators import (VBool, VFloat, VInt, VNumber, VPath, VString, VTimedelta)
 
 
 class CBool(VBool, Converter):
@@ -207,3 +210,54 @@ class CString(VString, Converter):
 
     def super_validate(self, value: Any) -> str:
         return super().validate(value)
+
+
+class CTimedelta(VTimedelta, Converter):
+    """VTimedeltaの拡張バリデータです。
+
+    timedelta型に変換可能なオブジェクトは例外を投げずに変換を行います。
+    """
+    cmp_timedelta = re.compile('(\\d+ ?days?,? ?)?(\\d+):(\\d+):(\\d+)(\\.\\d+)?')
+    cmp_days = re.compile('(\\d+) ?days?,? ?')
+
+    def validate(self, value: Any) -> timedelta:
+        f = None
+        if (tv := type(value)) is dict:
+            f = self.__try_convert_dict
+        elif tv in (list, tuple):
+            f = self.__try_convert_container
+        elif tv is str:
+            f = self.__try_convert_str
+        try:
+            if f is not None:
+                value = f(value)
+        except:
+            msg = self.ERRMSG('timedelta型として扱える必要があります', value)
+            raise TypeError(msg)
+        return super().validate(value)
+
+    def super_validate(self, value: Any) -> Any:
+        return super().validate(value)
+
+    def __try_convert_dict(self, value: dict) -> timedelta:
+        return timedelta(**value)
+
+    def __try_convert_container(self, value: Union[list, tuple]) -> timedelta:
+        return timedelta(*value)
+
+    def __try_convert_str(self, value: str) -> timedelta:
+        if (match := self.cmp_timedelta.match(value)) is not None:
+            keys = ('days', 'hours', 'minutes', 'seconds', 'microseconds')
+            d = {}
+            for k, v in zip(keys, match.groups()):
+                if v is None:
+                    continue
+                if k == 'days':
+                    if (find := self.cmp_days.match(v)) is not None:
+                        v = find.groups()[0]
+                elif k == 'microseconds':
+                    v = v[1:]
+                v = int(v)
+                d[k] = v
+            return self.__try_convert_dict(d)
+        raise TypeError

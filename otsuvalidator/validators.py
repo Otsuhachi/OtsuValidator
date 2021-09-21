@@ -1,6 +1,7 @@
 import inspect
 import re
 
+from datetime import timedelta
 from pathlib import Path
 from typing import Any, Callable, Optional, Union, cast, overload
 
@@ -178,6 +179,16 @@ class VRegex(VString):
         if not re.match(self.pattern, value):
             msg = self.ERRMSG(f'正規表現{repr(self.pattern)}に対応している必要があります', value)
             raise ValueError(msg)
+        return value
+
+
+class VTimedelta(Validator):
+    """適切な経過時間かどうかを確認するバリデータです。
+    """
+    def validate(self, value: Any) -> timedelta:
+        if type(value) is not timedelta:
+            msg = self.ERRMSG(f'timedelta型である必要があります', value)
+            raise TypeError(msg)
         return value
 
 

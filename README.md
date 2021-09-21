@@ -1,8 +1,11 @@
--   [概要](#概要)
-    -   [インストール](#インストール)
-    -   [モジュール](#モジュール)
-    -   [継承規則](#継承規則)
-    -   [実行例](#実行例)
+- [概要](#概要)
+  - [インストール](#インストール)
+  - [モジュール](#モジュール)
+  - [継承規則](#継承規則)
+  - [実行例-バリデータ](#実行例-バリデータ)
+  - [コンバータの変換](#コンバータの変換)
+    - [実行例-コンバータ](#実行例-コンバータ)
+  - [cast](#cast)
 
 # 概要
 
@@ -32,99 +35,114 @@
 
 モジュールは以下の3つが存在します。
 
-|               モジュール名               | 概要                                                 |
-| :--------------------------------: | :------------------------------------------------- |
-|      [bases](#basesモジュールのクラス)      | バリデータ、コンバータの基底クラスが定義されている<br>自作のバリデータを定義するときに使用できる |
-| [validators](#validatorsモジュールのクラス) | バリデータが定義されている                                      |
-| [converters](#convertersモジュールのクラス) | コンバータが定義されている                                      |
+モジュール名|概要
+:--:|--
+[bases](#basesモジュールのクラス)|バリデータ、コンバータの基底クラスが定義されいる<br>自作のバリデータを定義するときに使用できる
+[validators](#validatorsモジュールのクラス)|バリデータが定義されている
+[converters](#convertersモジュールのクラス)|コンバータが定義されている
 
+
+omit in toc
+<!-- omit in toc -->
 ### basesモジュールのクラス
 
 `Validator`と表記されている部分に関しては、バリデータ、コンバータ両方を指します。
 
-|     クラス    | 概要                                                                                    |
-| :--------: | :------------------------------------------------------------------------------------ |
-|  Validator | すべてのバリデータ、コンバータの基底クラス                                                                 |
-| VContainer | コンテナ用のバリデータの基底クラス<br>中身が可変なクラスのバリデータを定義するときに使用する                                      |
-|  Converter | コンバータの基底クラス<br>セキュアさが重視される場面では使用しない                                                   |
-CNoneable|`Validator`既定のバリデーションに加え、`None`を許可する<br>変換の可否は以下の2点に依存する<br>- 渡した`Validator`がコンバータか否か<br>- 所属する`VContainer`の`allow_convert`オプション
-| CNumerical | 数値型用コンバータの基底クラス<br>`value`に対し、`int`変換、`float`変換を試みるメソッドが定義されている<br>`complex`は想定されていない |
+クラス|概要
+:--:|:--
+Validator|すべてのバリデータ、コンバータの基底クラス
+VContainer|コンテナ用のバリデータの基底クラス<br>中身が可変なクラスのバリデータを定義するときに使用する
+Converter|コンバータの基底クラス<br>セキュアさが重視される場面では使用しない
+CNoneable|`Validator`既定のバリデーションに加え、`None`を許可する<br>変換の可否は以下の2点に依存する<br>-渡した`Validator`がコンバータか否か<br>-所属する`VContainer`の`allow_convert`オプション
+CNumerical|数値型用コンバータの基底クラス<br>`value`に対し、`int`変換、`float`変換を試みるメソッドが定義されている<br>`complex`は想定されていない
 
+<!-- omit in toc -->
 ### validatorsモジュールのクラス
 
 スーパークラスの表記がないものは`Validator`を継承しています。
 
-|   クラス   |   スーパークラス  | 概要                 |     期待する型    |
-| :-----: | :--------: | :----------------- | :----------: |
-|  VBool  |            | 真偽値オブジェクトか         |     bool     |
-| VChoice |            | 選択肢の中から1つが選択されているか |      Any     |
-| VNumber |            | 適切な数値か             |  int, flaot  |
-|  VFloat |   VNumber  | 適切な浮動小数点数か         |     flaot    |
-|   VInt  |   VNumber  | 適切な整数か             |      int     |
-|  VPath  |            | 適切なパスか             | pathlib.Path |
-| VString |            | 適切な文字列か            |      str     |
-|  VRegex |   VString  | 正規表現にマッチする適切な文字列か  |      str     |
-|  VDict  | VContainer | 適切な辞書か             |     dict     |
-|  VList  | VContainer | 適切なリストか            |     list     |
-|  VTuple |  VContaner | 適切なタプルか            |     tuple    |
+クラス|スーパークラス|概要|期待する型
+:--:|:--:|:--|:--:
+VBool||真偽値オブジェクトか|bool
+VChoice||選択肢の中から1つが選択されているか|Any
+VNumber||適切な数値か|int,flaot
+VFloat|VNumber|適切な浮動小数点数か|flaot
+VInt|VNumber|適切な整数か|int
+VPath||適切なパスか|pathlib.Path
+VString||適切な文字列か|str
+VRegex|VString|正規表現にマッチする適切な文字列か|str
+VDict|VContainer|適切な辞書か|dict
+VList|VContainer|適切なリストか|list
+VTuple|VContaner|適切なタプルか|tuple
+VTimedelta||適切な経過時間型か|datetime.timedelta
 
+<!-- omit in toc -->
 ### convertersモジュールのクラス
 
 スーパークラスにコンバータが記載されていないクラスは`Converter`を継承しています。
 
-|   クラス   |       スーパークラス       | 概要                                                                                             |
-| :-----: | :-----------------: | :--------------------------------------------------------------------------------------------- |
-|  CBool  |   VBool, Converter  | 一般に**Yes/Noとして解釈できる値**に対し、bool変換を試み、検証を行う<br>`bool(value)`では`True`になるものが`False`になったり例外が発生したりする |
-| CNumber | VNumber, CNumerical | `int`, `float`型への変換を試み、検証を行う                                                                   |
-|  CFloat |  VFloat, CNumerical | `float`型への変換を試み、検証を行う                                                                          |
-|   CInt  |   VInt, CNumerical  | `int`型への変換を試み、検証を行う                                                                            |
-|  CPath  |   VPath, Converter  | `Path`型への変換を試み、検証を行う                                                                           |
-| CString |  VString, Converter | `str`型への変換を試み、検証を行う                                                                            |
+クラス|スーパークラス|概要
+:--:|:--:|:--
+CBool|VBool,Converter|一般に**Yes/Noとして解釈できる値**に対し、bool変換を試み、検証を行う<br>`bool(value)`では`True`になるものが`False`になったり例外が発生したりする
+CNumber|VNumber, CNumerical|`int`,`float`型への変換を試み、検証を行う
+CFloat|VFloat, CNumerical|`float`型への変換を試み、検証を行う
+CInt|VInt, CNumerical|`int`型への変換を試み、検証を行う
+CPath|VPath, Converter|`Path`型への変換を試み、検証を行う
+CString|VString, Converter|`str`型への変換を試み、検証を行う
+CTimedelta|VTimedelta, Converter|`datetime.timedelta`型への変換を試み、検証を行う
 
 ## 継承規則
 
-きちんと動作するバリデータ、コンバータを定義するために規則です。  
+きちんと動作するバリデータ、コンバータを定義するための規則です。  
 `CNoneable`は**継承しないでください。**
 
+<!-- no toc -->
 -   [Validator継承規則](#validator継承規則)
 -   [VContainer継承規則](#vcontainer継承規則)
 -   [Converter継承規則](#converter継承規則)
 
+<!-- omit in toc -->
 ### Validator継承規則
 
-|  規則 | 概要                                      | 理由                    |
-| :-: | :-------------------------------------- | :-------------------- |
-|  命名 | クラス名は`V{検証したいクラス名}`とする                  | 管理のしやすさ               |
-|  継承 | `Validator`を継承する                        |                       |
-|  定義 | `validate`メソッドを定義し、検証が通った場合には`value`を返す | 拡張してコンバータを定義するときに必要   |
-|  変換 | `value`の型を変換しない                         | 変換と検証を行う場合はコンバータを使用する |
+規則|概要|理由
+:--:|:--|:--
+命名|クラス名は`V{検証したいクラス名}`とする|管理のしやすさ
+継承|`Validator`を継承する|
+定義|`validate`メソッドを定義し、検証が通った場合には`value`を返す|拡張してコンバータを定義するときに必要
+変換|`value`の型を変換しない|変換と検証を行う場合はコンバータを使用する
 
+<!-- omit in toc -->
 ### VContainer継承規則
 
-|  規則 | 概要                                                                                                | 理由                                              |
-| :-: | :------------------------------------------------------------------------------------------------ | :---------------------------------------------- |
-|  命名 | クラス名は`V{検証したいクラス名}`とする                                                                            | 管理のしやすさ<br>本質的にはValidatorと変わらないので規則もそのまま適用      |
-|  継承 | `VContainer`を継承する                                                                                 |                                                 |
-|  定義 | `validate`メソッドを定義し、検証が通った場合には`value`を返す<br>変換を許可する場合、`TEMPLATE`が`Validator`以外の場合など細かな違いを設定する必要がある | コンテナそのものの検証と中身の検証が必要                            |
-|  変換 | `value`の型を変換しない<br>`value`の各要素`v`に対してはオプション次第                                                     | `TEMPLATE`にコンバータを渡している場合、禁止されていない限り変換を行うのが自然なため |
+規則|概要|理由|
+:--:|:--|:--
+命名|クラス名は`V<検証したいクラス名>`とする|管理のしやすさ<br>本質的にはValidatorと変わらないので規則もそのまま適用
+継承|`VContainer`を継承する|
+定義|`validate`メソッドを定義し、検証が通った場合には`value`を返す<br>変換を許可する場合、`TEMPLATE`が`Validator`以外の場合など細かな違いを設定する必要がある|コンテナそのものの検証と中身の検証が必要
+変換|`value`の型を変換しない<br>`value`の各要素`v`に対してはオプション次第|`TEMPLATE`にコンバータを渡している場合、禁止されていない限り変換を行うのが自然なため
 
+<!-- omit in toc -->
 ### Converter継承規則
 
 `CNumerical`についてもここに従ってください。
 
-|  規則 | 概要                                                                                                          | 理由                                                   |
-| :-: | :---------------------------------------------------------------------------------------------------------- | :--------------------------------------------------- |
-|  命名 | クラス名は`C{変換検証したいクラス名}`とする                                                                                    | 一目で変換を行うクラスと認識するため                                   |
-|  継承 | `(検証したいクラスのバリデータ, コンバータ)`を継承する                                                                              | `検証したいクラスのバリデータ.validate`メソッドを`validate`メソッド内で呼び出すため |
-|  定義 | `validate`メソッドを定義し、変換検証が通った場合には変換された`value`を返す<br>`super_validate`メソッドを定義し、`検証したいクラス.validate`メソッドを行えるようにする | VContainerなど、変換を許可したくない状況では`super_validate`を使用するため   |
-|  変換 | `validate`メソッド内で変換を試みる<br>`super_validate`メソッドでは変換しない                                                       | 定義で書いた通り無変換が必要になる場面もあるため                             |
+規則|概要|理由
+:--:|:--|:--
+命名|クラス名は`C<変換検証したいクラス名>`とする|一目で変換を行うクラスと認識するため
+継承|`(検証したいクラスのバリデータ,コンバータ)`を継承する|`検証したいクラスのバリデータ.validate`メソッドを`validate`メソッド内で呼び出すため
+定義|`validate`メソッドを定義し、変換検証が通った場合には変換された`value`を返す<br>`super_validate`メソッドを定義し、`検証したいクラス.validate`メソッドを行えるようにする|VContainerなど、変換を許可したくない状況では`super_validate`を使用するため
+変換|`validate`メソッド内で変換を試みる<br>`super_validate`メソッドでは変換しない|定義で書いた通り無変換が必要になる場面もあるため
 
-## 実行例
+## 実行例-バリデータ
 
+<!-- omit in toc -->
 ### バリデータの実行例
 
 バリデータをディスクリプタとして使用している`Student`クラスを試しに使用します。
+<!-- omit in toc -->
 #### バリデータの実行例目次
+
+<!-- no toc -->
 - [前提コード](#バリデータ実行例-前提コード)
 - [nameの操作](#バリデータ実行例-nameの操作)
 - [ageの操作](#バリデータ実行例-ageの操作)
@@ -134,6 +152,7 @@ CNoneable|`Validator`既定のバリデーションに加え、`None`を許可�
 - [addressの操作](#バリデータ実行例-addressの操作)
 - [成功](#バリデータ実行例-成功)
 
+<!-- omit in toc -->
 #### バリデータ実行例-前提コード
 
 [目次](#バリデータの実行例目次)に戻る
@@ -198,6 +217,7 @@ class Student:
 otsuhachi = Student()
 ```
 
+<!-- omit in toc -->
 #### バリデータ実行例-nameの操作
 
 [目次](#バリデータの実行例目次)に戻る
@@ -237,6 +257,7 @@ ValueError: 属性'name'は指定した形式に対応している必要があ�
 'Otsuhachi'
 ```
 
+<!-- omit in toc -->
 #### バリデータ実行例-ageの操作
 
 [目次](#バリデータの実行例目次)に戻る
@@ -269,6 +290,7 @@ ValueError: 属性'age'は150より大きい値を設定することはできま
 28
 ```
 
+<!-- omit in toc -->
 #### バリデータ実行例-genderの操作
 
 [目次](#バリデータの実行例目次)に戻る
@@ -303,10 +325,12 @@ ValueError: 属性'gender'は{'male', 'others', 'female'}のいずれかであ�
 'male'
 ```
 
+<!-- omit in toc -->
 #### バリデータ実行例-gradesの操作
 
 [目次](#バリデータの実行例目次)に戻る
 
+<!-- no toc -->
 - [gradesの概要](#gradesの概要)
 - [gradesの基本的な失敗と成功の例](#gradesの基本的な失敗と成功の例)
 - [gradesで起こりえる不正](#gradesで起こりえる不正)
@@ -335,6 +359,7 @@ VDict(
 )
 ```
 
+<!-- omit in toc -->
 ##### gradesの概要
 
 
@@ -351,6 +376,7 @@ VDict(
 
 以上のような設定のバリデータになっています。
 
+<!-- omit in toc -->
 ##### gradesの基本的な失敗と成功の例
 
 ```python
@@ -414,6 +440,7 @@ ValueError: 属性'grades'は以下のキーを設定することはできませ
 {'Japanese': 68, 'Social Studies': 28, 'Math': {'Math1': 66}}
 ```
 
+<!-- omit in toc -->
 ##### gradesで起こりえる不正
 
 この設定では書き換えに対して無力です。  
@@ -432,6 +459,7 @@ ValueError: 属性'grades'は以下のキーを設定することはできませ
 {'Japanese': 68, 'Social Studies': 28, 'Math': 66}
 ```
 
+<!-- omit in toc -->
 ##### gradesで起こりえる不正の防止
 
 不正の防止には主に2つの手段があります。
@@ -529,6 +557,7 @@ Traceback (most recent call last):
 TypeError: キー'Math'は不正な値です。(66: int)
 ```
 
+<!-- omit in toc -->
 #### バリデータ実行例-hobbyの操作
 
 [目次](#バリデータの実行例目次)に戻る
@@ -590,6 +619,7 @@ TypeError: インデックス2は不正な値です。(1: int)
 ```
 
 
+<!-- omit in toc -->
 #### バリデータ実行例-addressの操作
 
 [目次](#バリデータの実行例目次)に戻る
@@ -646,6 +676,7 @@ ValueError: インデックス1は不正な値です。('Otsu Prefecture2': str)
 ['282-2828', 'Otsu Prefecture', 'OtsuCity']
 ```
 
+<!-- omit in toc -->
 #### バリデータ実行例-成功
 
 [目次](#バリデータの実行例目次)に戻る
@@ -670,3 +701,122 @@ ValueError: インデックス1は不正な値です。('Otsu Prefecture2': str)
 趣味: ['PC', 'game']
 住所: ['282-2828', 'Otsu Prefecture', 'OtsuCity']
 ```
+
+## コンバータの変換
+
+基本的にコンバータは`C<対象の型名>`で、`<対象の型>(value)`で変換できるかどうかを試すのが基本になります。  
+たとえば`CString`ならば`str(value)`を試みてから検証を行います。
+しかし、コンバータによってはその基本に従わないものがあります。  
+`CInt`は、`int(value)`できなかった場合に`int(float(value))`を試します(`CFloat`はその逆の動作です)。  
+これはまだ理解しやすい変換ですが、以下の2つのコンバータは若干特殊な挙動の変換を行います。  
+これは`json`ファイルや`標準入力`などで受け取った場合の変換処理を容易に行うためです。
+
+<!-- omit in toc -->
+### CTimedelta
+
+このコンバータは`str`, `dict`, `list`, `tuple`いずれかの型である場合に`Timedelta`型に変換を試みます。  
+変換に必要な形式は以下の通りです。
+
+型|形式
+:--|:--
+str|`(<日>( )day(s, ))<時>:<分>:<秒>(.<ミリ秒>)`<br>`()`で囲まれた部分の有無は任意<br>要は`str(<timedeltaインスタンス>)`で変換された後の形式(厳密には日と時間の間の空白を問わないなど若干異なる)
+dict|`timedelta(**value)`でインスタンスを生成できる形式
+list, tuple|`timedelta(*value)`でインスタンスを生成できる形式
+
+<!-- omit in toc -->
+### CBool
+
+このコンバータは以下の標準定義の項目を`bool`に変換します。  
+また、自分で`True`になる値、`False`になる値を設定することも可能です。  
+さらに、`f(value)`が真偽値を返す関数`f`のタプルを渡して判定することも可能です。
+
+以下が標準定義の真偽値対応表です。
+`str`型は`value.lower()`されたあとで判定されるので、大文字小文字を問いません。
+
+型|True|False
+:--:|:--:|:--:
+bool|True|False
+str|'true', 'yes', 'y', '1'|'false', 'no', 'n', '0'
+int|1|0
+float|1.0|0.0
+
+### 実行例-コンバータ
+
+
+```python
+
+from datetime import timedelta
+from typing import cast
+
+from otsuvalidator import CBool, CTimedelta
+
+
+class SampleClass:
+    bool_dflt: bool = cast(bool, CBool())
+    bool_user: bool = cast(bool, CBool(true_data=('はい', ), false_data=('いいえ', )))
+    td_timedelta: timedelta = cast(timedelta, CTimedelta())
+    td_str: timedelta = cast(timedelta, CTimedelta())
+    td_tuple: timedelta = cast(timedelta, CTimedelta())
+    td_dict: timedelta = cast(timedelta, CTimedelta())
+
+    def show(self):
+        keys = (
+            'bool_dflt',
+            'bool_user',
+            'td_timedelta',
+            'td_str',
+            'td_tuple',
+            'td_dict',
+        )
+        for k in keys:
+            v = getattr(self, k)
+            print(f'{k}: {v}({type(v).__name__})')
+
+
+s = SampleClass()
+td = timedelta(days=1, seconds=2, microseconds=3, milliseconds=4, minutes=5, hours=6, weeks=7)
+# s.bool_dflt = 'はい'  # Error
+
+# 一般にYes/Noとして解釈されるものはboolに変換
+s.bool_dflt = 'yes'
+
+# ユーザ定義のTrueなのでTrueになる
+s.bool_user = 'はい'
+
+# 無変換でtimedelta
+s.td_timedelta = td
+
+# 特定形式の文字列をtimedeltaに変換
+s.td_str = '50 days, 0:0:1'
+
+# 特定形式のタプル、リストをtimedeltaに変換
+s.td_tuple = (1, 2, 3, 4, 5, 7)
+
+# 特定形式の辞書をtimedeltaに変換
+s.td_dict = {'seconds': 2, 'microseconds': 3, 'milliseconds': 4, 'minutes': 5, 'hours': 6}
+
+# 属性名: str(属性)(属性の型)を出力
+s.show()
+```
+
+```console
+
+bool_dflt: True(bool)
+bool_user: True(bool)
+td_timedelta: 50 days, 6:05:02.004003(timedelta)
+td_str: 50 days, 0:00:01(timedelta)
+td_tuple: 1 day, 7:05:02.004003(timedelta)
+td_dict: 6:05:02.004003(timedelta)
+```
+
+
+## cast
+
+[ここ](#実行例-コンバータ)でクラス属性に`bool_dflt:bool = cast(bool, CBool())`として`bool_dflt`属性を`bool`として認識するようにしました。  
+しかし、これでは`s.bool_dflt = 'はい'`の部分でlinterがエラーを表示するようになります。  
+これは`property`のようにlinterでの型表示をいい感じにする方法がわからなかったので、苦肉の策となります。  
+
+もちろん、アクセスするたびに`cast`してしまえばいい話ですが、面倒です。  
+この方法では属性を代入するときにはエラーが出る代わりに、属性にアクセスする際に扱いやすくなるので、`cast`の使用は好みで使い分けてください。  
+
+**残念ながら現状ではアクセスの利便性と代入時のエラーはトレードオフになります。**
