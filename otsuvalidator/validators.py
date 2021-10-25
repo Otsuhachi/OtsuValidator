@@ -94,7 +94,7 @@ class VInt(VNumber):
 class VPath(Validator):
     """適切なパスかどうかを確認するバリデータです。
     """
-    def __init__(self, *suffix: str, exist_only: bool = False):
+    def __init__(self, *suffix: str, exist_only: bool = False, path_type: Optional[Callable[[Path], bool]] = None):
         """許可する拡張子とパスの存在確認を行うかを設定し、バリデータを生成します。
 
         拡張子は複数許可することもできます。
@@ -103,7 +103,9 @@ class VPath(Validator):
 
         Args:
             exist_only (bool, optional): 有効にすると、存在しないパスに対して例外を投げます。
+            path_type (Optional[Callable[[Path], bool]], optional): パスのタイプを判定し、一致しない場合に例外を発生させます。Path.is_dir, Path.is_fileなどを渡すことを想定しています。
         """
+        self.path_type = path_type
         self.exist_only = exist_only
         self.suffix = tuple(set(map(lambda x: '.' + x.lstrip('.') if x else x, suffix)))
 
@@ -116,9 +118,14 @@ class VPath(Validator):
             if value.suffix not in sf:
                 msg = E(f'拡張子が{sf[0]}である必要があります' if len(sf) == 1 else f'拡張子が{sf}のいずれかである必要があります', value)
                 raise ValueError(msg)
-        if self.exist_only and not value.exists():
-            msg = E('存在するパスである必要があります', value)
-            raise FileNotFoundError(msg)
+        if value.exists():
+            if (pt := self.path_type) is not None and not pt(value):
+                msg = E(f'{pt}がTrueを返すパスである必要があります', value)
+                raise FileExistsError(msg)
+        else:
+            if self.exist_only:
+                msg = E('存在するパスである必要があります', value)
+                raise FileNotFoundError(msg)
         return value
 
 
