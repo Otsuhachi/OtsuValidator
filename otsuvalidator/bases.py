@@ -6,10 +6,11 @@ class Validator(ABC):
     """すべてのバリデータの基底クラスです。
 
     このクラスを継承してvalidateメソッドを定義してください。
-    
+
     またvalidateメソッドは検証を通過したvalueを返すようにしてください。
     これはコンバータ等に流用するときのためです。
     """
+
     def __set_name__(self, cls, name):
         self.name = name
         self.private_name = '_' + name
@@ -59,7 +60,8 @@ class VContainer(Validator):
     __set__を経由せずに内容が書き換わる可能性があるので、__get__時に再検証を行うオプションmonitoring_overwriteを持ちます。
     入れ子構造のコンテナバリデータは、親の検証が行われる際に検証されてしまうので、このオプションは実質的に親の設定が伝播します。
     """
-    def __init__(self, TEMPLATE: Any, monitoring_overwrite: bool = True, allow_convert: bool = True):
+
+    def __init__(self, TEMPLATE: Any, monitoring_overwrite: bool = True, allow_convert: bool = True) -> None:
         """雛形、アクセス時に再検証を行うか、変換を許可するかを設定してバリデータを生成します。
 
         変換を許可する場合、元のコンテナまたはコンテナ内の要素は異なるidを持つ場合があります。
@@ -73,7 +75,7 @@ class VContainer(Validator):
         self.monitoring_overwrite = monitoring_overwrite
         self.allow_convert = allow_convert
 
-    def __get__(self, instance, otype):
+    def __get__(self, instance, otype) -> Any:
         res = super().__get__(instance, otype)
         if self.monitoring_overwrite:
             res = self.validate(res)
@@ -85,6 +87,7 @@ class Converter(Validator):
 
     バリデータとこのクラスを継承してsuper_validateメソッドを定義してください。
     """
+
     @abstractmethod
     def super_validate(self, value: Any) -> Any:
         """スーパークラスのvalidateを使用して検証を行います。
@@ -104,7 +107,8 @@ class Converter(Validator):
 class CNoneable(Converter):
     """バリデータまたはコンバータにNoneを含めることを許可するクラスです。
     """
-    def __init__(self, validator: Union[Validator, Converter], monitoring_overwrite: bool = True):
+
+    def __init__(self, validator: Union[Validator, Converter], monitoring_overwrite: bool = True) -> None:
         """バリデータ、コンバータのインスタンスを渡し、追加でNoneを許可するようにします。
 
         Args:
@@ -161,6 +165,7 @@ class CNumerical(Converter):
     Args:
         Converter ([type]): [description]
     """
+
     @staticmethod
     def try_int(value: Any) -> Optional[int]:
         """intへの変換を試みます。
