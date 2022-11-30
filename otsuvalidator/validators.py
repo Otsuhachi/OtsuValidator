@@ -5,12 +5,16 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Any, Callable, Optional, Union, cast, overload
 
-from otsuvalidator.bases import Converter, Validator, VContainer
+from .bases import Converter, Validator, VContainer
 
 
 class VBool(Validator):
     """真偽値かどうかを確認するバリデータです。
     """
+
+    def __get__(self, instance, otype) -> bool:
+        return super().__get__(instance, otype)
+
     def validate(self, value: Any) -> bool:
         if type(value) is not bool:
             msg = self.ERRMSG('bool型である必要があります', value)
@@ -21,7 +25,8 @@ class VBool(Validator):
 class VChoice(Validator):
     """選択肢の中から1つが選択されているかどうかを確認するバリデータです。
     """
-    def __init__(self, *options: Any):
+
+    def __init__(self, *options: Any) -> None:
         """選択肢を設定し、バリデータを生成します。
         """
         if not options:
@@ -39,7 +44,8 @@ class VChoice(Validator):
 class VNumber(Validator):
     """適切な数値かどうかを確認するバリデータです。
     """
-    def __init__(self, minimum: Optional[Union[int, float]] = None, maximum: Optional[Union[int, float]] = None):
+
+    def __init__(self, minimum: Optional[Union[int, float]] = None, maximum: Optional[Union[int, float]] = None) -> None:
         """下限値と上限値を指定してバリデータを生成します。
 
         Args:
@@ -74,6 +80,10 @@ class VNumber(Validator):
 class VFloat(VNumber):
     """適切な浮動小数点数かどうかを確認するバリデータです。
     """
+
+    def __get__(self, instance, otype) -> float:
+        return super().__get__(instance, otype)
+
     def validate(self, value: Any) -> float:
         if type(value) is not float:
             msg = self.ERRMSG('float型である必要があります', value)
@@ -84,6 +94,10 @@ class VFloat(VNumber):
 class VInt(VNumber):
     """適切な整数かどうかを確認するバリデータです。
     """
+
+    def __get__(self, instance, otype) -> int:
+        return super().__get__(instance, otype)
+
     def validate(self, value: Any) -> int:
         if type(value) is not int:
             msg = self.ERRMSG('int型である必要があります', value)
@@ -94,7 +108,11 @@ class VInt(VNumber):
 class VPath(Validator):
     """適切なパスかどうかを確認するバリデータです。
     """
-    def __init__(self, *suffix: str, exist_only: bool = False, path_type: Optional[Callable[[Path], bool]] = None):
+
+    def __get__(self, instance, otype) -> Path:
+        return super().__get__(instance, otype)
+
+    def __init__(self, *suffix: str, exist_only: bool = False, path_type: Optional[Callable[[Path], bool]] = None) -> None:
         """許可する拡張子とパスの存在確認を行うかを設定し、バリデータを生成します。
 
         拡張子は複数許可することもできます。
@@ -132,7 +150,11 @@ class VPath(Validator):
 class VString(Validator):
     """適切な文字列かどうかを確認するバリデータです。
     """
-    def __init__(self, minimum: Optional[int] = None, maximum: Optional[int] = None, checker: Optional[Callable[[str], bool]] = None):
+
+    def __get__(self, instance, otype) -> str:
+        return super().__get__(instance, otype)
+
+    def __init__(self, minimum: Optional[int] = None, maximum: Optional[int] = None, checker: Optional[Callable[[str], bool]] = None) -> None:
         """最低文字数、最大文字数、確認関数を設定してバリデータを生成します。
 
         Args:
@@ -169,7 +191,7 @@ class VRegex(VString):
     """
     pattern = VString()
 
-    def __init__(self, pattern: str, minimum: Optional[int] = None, maximum: Optional[int] = None, checker: Optional[Callable[[str], bool]] = None):
+    def __init__(self, pattern: str, minimum: Optional[int] = None, maximum: Optional[int] = None, checker: Optional[Callable[[str], bool]] = None) -> None:
         """正規表現、最低文字数、最大文字数、確認関数を設定してバリデータを生成します。
 
         Args:
@@ -192,9 +214,13 @@ class VRegex(VString):
 class VTimedelta(Validator):
     """適切な経過時間かどうかを確認するバリデータです。
     """
+
+    def __get__(self, instance, otype) -> timedelta:
+        return super().__get__(instance, otype)
+
     def validate(self, value: Any) -> timedelta:
         if type(value) is not timedelta:
-            msg = self.ERRMSG(f'timedelta型である必要があります', value)
+            msg = self.ERRMSG('timedelta型である必要があります', value)
             raise TypeError(msg)
         return value
 
@@ -202,7 +228,11 @@ class VTimedelta(Validator):
 class VDict(VContainer):
     """適切な辞書かどうかを確認するバリデータです。
     """
-    def __init__(self, TEMPLATE: dict, allow_missing_key: bool, monitoring_overwrite: bool = True, allow_convert: bool = True):
+
+    def __get__(self, instance, otype) -> dict:
+        return super().__get__(instance, otype)
+
+    def __init__(self, TEMPLATE: dict, allow_missing_key: bool, monitoring_overwrite: bool = True, allow_convert: bool = True) -> None:
         """雛形、キーの欠落を許可するか、アクセス時に再検証を行うか、変換を許可するかを設定してバリデータを生成します。
 
         Args:
@@ -250,12 +280,18 @@ class VDict(VContainer):
 class VList(VContainer):
     """適切なリストか確認するバリデータです。
     """
-    def __init__(self,
-                 TEMPLATE: Union[list, Validator, Any],
-                 minimum: Optional[int] = None,
-                 maximum: Optional[int] = None,
-                 monitoring_overwrite: bool = True,
-                 allow_convert: bool = True):
+
+    def __get__(self, instance, otype) -> list:
+        return super().__get__(instance, otype)
+
+    def __init__(
+        self,
+        TEMPLATE: Union[list, Validator, Any],
+        minimum: Optional[int] = None,
+        maximum: Optional[int] = None,
+        monitoring_overwrite: bool = True,
+        allow_convert: bool = True,
+    ) -> None:
         """雛形、最小、最大要素数、アクセス時に再検証を行うか、変換を許可するかを設定し、バリデータを作成します。
 
         TEMPLATEがAnyの場合、クラスか、インスタンスかでbool以外の型チェックの挙動が変化します。
@@ -367,12 +403,18 @@ class VList(VContainer):
 class VTuple(VContainer):
     """適切なタプルか確認するバリデータです。
     """
-    def __init__(self,
-                 TEMPLATE: Union[tuple, Validator, Any],
-                 minimum: Optional[int] = None,
-                 maximum: Optional[int] = None,
-                 monitoring_overwrite: bool = True,
-                 allow_convert: bool = True):
+
+    def __get__(self, instance, otype) -> tuple:
+        return super().__get__(instance, otype)
+
+    def __init__(
+        self,
+        TEMPLATE: Union[tuple, Validator, Any],
+        minimum: Optional[int] = None,
+        maximum: Optional[int] = None,
+        monitoring_overwrite: bool = True,
+        allow_convert: bool = True,
+    ) -> None:
         """雛形、最小、最大要素数、アクセス時に再検証を行うか、変換を許可するかを設定し、バリデータを作成します。
 
         TEMPLATEがAnyの場合、クラスオブジェクトか、インスタンスかでbool以外の型チェックの挙動が変化します。
@@ -457,7 +499,8 @@ class VTuple(VContainer):
 
     def _validate_of_structure(self, value) -> tuple:
         E = self.ERRMSG
-        if (diff_len := len(value) - len(self.TEMPLATE)) > 0:
+        TMP = cast(tuple, self.TEMPLATE)
+        if (diff_len := len(value) - len(TMP)) > 0:
             msg = E(f'あと{diff_len}個減らす必要があります', value)
             raise ValueError(msg)
         if diff_len < 0:
@@ -465,7 +508,7 @@ class VTuple(VContainer):
             raise ValueError(msg)
         if self.allow_convert:
             return self._validate_of_structure_allow(value)
-        for i, (v, validator) in enumerate(zip(value, self.TEMPLATE)):
+        for i, (v, validator) in enumerate(zip(value, TMP)):
             if isinstance(validator, Validator):
                 try:
                     if isinstance(validator, Converter):
@@ -494,7 +537,8 @@ class VTuple(VContainer):
     def _validate_of_structure_allow(self, value) -> tuple:
         E = self.ERRMSG
         res = []
-        for i, (v, validator) in enumerate(zip(value, self.TEMPLATE)):
+        TMP = cast(tuple, self.TEMPLATE)
+        for i, (v, validator) in enumerate(zip(value, TMP)):
             if isinstance(validator, Validator):
                 try:
                     if isinstance(validator, Converter):

@@ -5,12 +5,20 @@ from pathlib import Path
 from typing import Any, Callable, Optional, Tuple, Union, cast, overload
 
 from .bases import CNumerical, Converter
-from .validators import (VBool, VFloat, VInt, VNumber, VPath, VString, VTimedelta)
+from .validators import (
+    VBool,
+    VFloat,
+    VInt,
+    VNumber,
+    VPath,
+    VString,
+    VTimedelta,
+)
 
 
 class CBool(VBool, Converter):
     """VBoolの拡張バリデータです。
-    
+
     一般にYes/Noとして解釈できる値に対し、bool変換を試みます。
     bool(value)とは異なる結果を返すことがあります。
     また、Trueにしたい値、Falseにしたい値をタプル形式で登録することでその通りに判定するようになります。
@@ -28,10 +36,13 @@ class CBool(VBool, Converter):
         int型: 0
         float型: 0.0
     """
-    def __init__(self,
-                 true_data: Optional[Tuple[Any, ...]] = None,
-                 false_data: Optional[Tuple[Any, ...]] = None,
-                 checker: Optional[Tuple[Callable[[Any], bool], ...]] = None):
+
+    def __init__(
+        self,
+        true_data: Optional[Tuple[Any, ...]] = None,
+        false_data: Optional[Tuple[Any, ...]] = None,
+        checker: Optional[Tuple[Callable[[Any], bool], ...]] = None,
+    ) -> None:
         """ユーザ定義のTrueにしたい値、Falseにしたい値を設定してバリデータを生成します。
 
         Args:
@@ -103,6 +114,7 @@ class CNumber(VNumber, CNumerical):
     (int, float)型に変換可能なオブジェクトは例外を投げずに変換を試みます。
     どちらにも変換可能な場合、int(value)==float(value)の結果が同じ時はintそれ以外はfloatで変換されます。
     """
+
     @overload
     def validate(self, value: int) -> int:
         ...
@@ -145,6 +157,7 @@ class CFloat(VFloat, CNumerical):
 
     float型に変換可能なオブジェクトは例外を投げずに変換を試みます。
     """
+
     def validate(self, value: Any) -> float:
         if type(value) is not float:
             convalue = self.try_float(value)
@@ -163,6 +176,7 @@ class CInt(VInt, CNumerical):
 
     int型に変換可能なオブジェクトは例外を投げずに変換を試みます。
     """
+
     def validate(self, value) -> int:
         if type(value) is not int:
             convalue = self.try_int(value)
@@ -181,6 +195,7 @@ class CPath(VPath, Converter):
 
     Path型に変換可能なオブジェクトは例外を投げずに変換を行います。
     """
+
     def validate(self, value: Any) -> Path:
         if not isinstance(value, Path):
             try:
@@ -199,6 +214,7 @@ class CString(VString, Converter):
 
     str型に変換可能なオブジェクトは例外を投げずに変換を行います。
     """
+
     def validate(self, value: Any) -> str:
         if type(value) is not str:
             try:
