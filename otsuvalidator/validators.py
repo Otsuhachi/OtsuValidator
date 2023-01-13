@@ -1,3 +1,22 @@
+"""基本的なバリデータを纏めたモジュールです。
+"""
+
+__all__ = (
+    "VBool",
+    "VChoice",
+    "VDict",
+    "VFloat",
+    "VInt",
+    "VList",
+    "VNumber",
+    "VPath",
+    "VRegex",
+    "VString",
+    "VTimedelta",
+    "VTuple",
+)
+
+
 import inspect
 import re
 
@@ -9,41 +28,37 @@ from .bases import Converter, Validator, VContainer
 
 
 class VBool(Validator):
-    """真偽値かどうかを確認するバリデータです。
-    """
+    """真偽値かどうかを確認するバリデータです。"""
 
     def __get__(self, instance, otype) -> bool:
         return super().__get__(instance, otype)
 
     def validate(self, value: Any) -> bool:
         if type(value) is not bool:
-            msg = self.ERRMSG('bool型である必要があります', value)
+            msg = self.ERRMSG("bool型である必要があります", value)
             raise TypeError(msg)
         return value
 
 
 class VChoice(Validator):
-    """選択肢の中から1つが選択されているかどうかを確認するバリデータです。
-    """
+    """選択肢の中から1つが選択されているかどうかを確認するバリデータです。"""
 
     def __init__(self, *options: Any) -> None:
-        """選択肢を設定し、バリデータを生成します。
-        """
+        """選択肢を設定し、バリデータを生成します。"""
         if not options:
-            msg = self.ERRMSG('1つ以上のoptionsを設定してください', options, False)
+            msg = self.ERRMSG("1つ以上のoptionsを設定してください", options, False)
             raise ValueError(msg)
         self.options = set(options)
 
     def validate(self, value: Any) -> Any:
         if value not in self.options:
-            msg = self.ERRMSG(f'{self.options}のいずれかである必要があります', value)
+            msg = self.ERRMSG(f"{self.options}のいずれかである必要があります", value)
             raise ValueError(msg)
         return value
 
 
 class VNumber(Validator):
-    """適切な数値かどうかを確認するバリデータです。
-    """
+    """適切な数値かどうかを確認するバリデータです。"""
 
     def __init__(self, minimum: Optional[Union[int, float]] = None, maximum: Optional[Union[int, float]] = None) -> None:
         """下限値と上限値を指定してバリデータを生成します。
@@ -66,48 +81,47 @@ class VNumber(Validator):
     def validate(self, value: Any) -> Any:
         E = self.ERRMSG
         if type(value) not in (int, float):
-            msg = E('(int, float)型のいずれかである必要があります', value)
+            msg = E("(int, float)型のいずれかである必要があります", value)
             raise TypeError(msg)
-        if (mini := self.minimum) is not None and value < mini:
-            msg = E(f'{mini}より小さい値を設定することはできません', value)
+        mini = self.minimum
+        if mini is not None and value < mini:
+            msg = E(f"{mini}より小さい値を設定することはできません", value)
             raise ValueError(msg)
-        if (maxi := self.maximum) is not None and value > maxi:
-            msg = E(f'{maxi}より大きい値を設定することはできません', value)
+        maxi = self.maximum
+        if maxi is not None and value > maxi:
+            msg = E(f"{maxi}より大きい値を設定することはできません", value)
             raise ValueError(msg)
         return value
 
 
 class VFloat(VNumber):
-    """適切な浮動小数点数かどうかを確認するバリデータです。
-    """
+    """適切な浮動小数点数かどうかを確認するバリデータです。"""
 
     def __get__(self, instance, otype) -> float:
         return super().__get__(instance, otype)
 
     def validate(self, value: Any) -> float:
         if type(value) is not float:
-            msg = self.ERRMSG('float型である必要があります', value)
+            msg = self.ERRMSG("float型である必要があります", value)
             raise TypeError(msg)
         return super().validate(value)
 
 
 class VInt(VNumber):
-    """適切な整数かどうかを確認するバリデータです。
-    """
+    """適切な整数かどうかを確認するバリデータです。"""
 
     def __get__(self, instance, otype) -> int:
         return super().__get__(instance, otype)
 
     def validate(self, value: Any) -> int:
         if type(value) is not int:
-            msg = self.ERRMSG('int型である必要があります', value)
+            msg = self.ERRMSG("int型である必要があります", value)
             raise TypeError(msg)
         return super().validate(value)
 
 
 class VPath(Validator):
-    """適切なパスかどうかを確認するバリデータです。
-    """
+    """適切なパスかどうかを確認するバリデータです。"""
 
     def __get__(self, instance, otype) -> Path:
         return super().__get__(instance, otype)
@@ -125,31 +139,32 @@ class VPath(Validator):
         """
         self.path_type = path_type
         self.exist_only = exist_only
-        self.suffix = tuple(set(map(lambda x: '.' + x.lstrip('.') if x else x, suffix)))
+        self.suffix = tuple(set(map(lambda x: "." + x.lstrip(".") if x else x, suffix)))
 
     def validate(self, value: Any) -> Path:
         E = self.ERRMSG
         if not isinstance(value, Path):
-            msg = E('Path型である必要があります', value)
+            msg = E("Path型である必要があります", value)
             raise TypeError(msg)
-        if (sf := self.suffix):
+        sf = self.suffix
+        if sf:
             if value.suffix not in sf:
-                msg = E(f'拡張子が{sf[0]}である必要があります' if len(sf) == 1 else f'拡張子が{sf}のいずれかである必要があります', value)
+                msg = E(f"拡張子が{sf[0]}である必要があります" if len(sf) == 1 else f"拡張子が{sf}のいずれかである必要があります", value)
                 raise ValueError(msg)
         if value.exists():
-            if (pt := self.path_type) is not None and not pt(value):
-                msg = E(f'{pt}がTrueを返すパスである必要があります', value)
+            pt = self.path_type
+            if pt is not None and not pt(value):
+                msg = E(f"{pt}がTrueを返すパスである必要があります", value)
                 raise FileExistsError(msg)
         else:
             if self.exist_only:
-                msg = E('存在するパスである必要があります', value)
+                msg = E("存在するパスである必要があります", value)
                 raise FileNotFoundError(msg)
         return value
 
 
 class VString(Validator):
-    """適切な文字列かどうかを確認するバリデータです。
-    """
+    """適切な文字列かどうかを確認するバリデータです。"""
 
     def __get__(self, instance, otype) -> str:
         return super().__get__(instance, otype)
@@ -169,17 +184,20 @@ class VString(Validator):
     def validate(self, value: Any) -> str:
         E = self.ERRMSG
         if type(value) is not str:
-            msg = E('str型である必要があります', value)
+            msg = E("str型である必要があります", value)
             raise TypeError(msg)
         lv = len(value)
-        if (mini := self.minimum) is not None and lv < mini:
-            msg = E(f'{mini}文字以上である必要があります', value)
+        mini = self.minimum
+        if mini is not None and lv < mini:
+            msg = E(f"{mini}文字以上である必要があります", value)
             raise ValueError(msg)
-        if (maxi := self.maximum) is not None and lv > maxi:
-            msg = E(f'{maxi}文字以下である必要があります', value)
+        maxi = self.maximum
+        if maxi is not None and lv > maxi:
+            msg = E(f"{maxi}文字以下である必要があります", value)
             raise ValueError(msg)
-        if (checker := self.checker) is not None and not checker(value):
-            msg = E(f'指定した形式に対応している必要があります。{repr(checker)}', value)
+        checker = self.checker
+        if checker is not None and not checker(value):
+            msg = E(f"指定した形式に対応している必要があります。{repr(checker)}", value)
             raise ValueError(msg)
         return value
 
@@ -189,6 +207,7 @@ class VRegex(VString):
 
     VStringの条件に加え、正規表現によるチェックをしたい場合に使用できます。
     """
+
     pattern = VString()
 
     def __init__(self, pattern: str, minimum: Optional[int] = None, maximum: Optional[int] = None, checker: Optional[Callable[[str], bool]] = None) -> None:
@@ -206,28 +225,26 @@ class VRegex(VString):
     def validate(self, value: Any) -> str:
         value = super().validate(value)
         if not re.match(self.pattern, value):
-            msg = self.ERRMSG(f'正規表現{repr(self.pattern)}に対応している必要があります', value)
+            msg = self.ERRMSG(f"正規表現{repr(self.pattern)}に対応している必要があります", value)
             raise ValueError(msg)
         return value
 
 
 class VTimedelta(Validator):
-    """適切な経過時間かどうかを確認するバリデータです。
-    """
+    """適切な経過時間かどうかを確認するバリデータです。"""
 
     def __get__(self, instance, otype) -> timedelta:
         return super().__get__(instance, otype)
 
     def validate(self, value: Any) -> timedelta:
         if type(value) is not timedelta:
-            msg = self.ERRMSG('timedelta型である必要があります', value)
+            msg = self.ERRMSG("timedelta型である必要があります", value)
             raise TypeError(msg)
         return value
 
 
 class VDict(VContainer):
-    """適切な辞書かどうかを確認するバリデータです。
-    """
+    """適切な辞書かどうかを確認するバリデータです。"""
 
     def __get__(self, instance, otype) -> dict:
         return super().__get__(instance, otype)
@@ -247,17 +264,19 @@ class VDict(VContainer):
     def validate(self, value) -> dict:
         E = self.ERRMSG
         if not isinstance(value, dict):
-            msg = E('dict型である必要があります', value)
+            msg = E("dict型である必要があります", value)
             raise TypeError(msg)
         self.TEMPLATE = cast(dict, self.TEMPLATE)
         KEYS = set(self.TEMPLATE.keys())
         VKEYS = set(value.keys())
-        if (KEYS ^ VKEYS):
-            if (unnecessary_keys := VKEYS - KEYS):
-                msg = E(f'以下のキーを設定することはできません。({unnecessary_keys})', value)
+        if KEYS ^ VKEYS:
+            unnecessary_keys = VKEYS - KEYS
+            if unnecessary_keys:
+                msg = E(f"以下のキーを設定することはできません。({unnecessary_keys})", value)
                 raise ValueError(msg)
-            if not self.allow_missing_key and (missing_key := KEYS - VKEYS):
-                msg = E(f'以下のキーを設定する必要があります。({missing_key})', value)
+            missing_key = KEYS - VKEYS
+            if not self.allow_missing_key and missing_key:
+                msg = E(f"以下のキーを設定する必要があります。({missing_key})", value)
                 raise ValueError(msg)
         for k, v in value.items():
             tv = self.TEMPLATE.get(k)
@@ -272,14 +291,13 @@ class VDict(VContainer):
                         tv.validate(v)
                 except Exception as e:
                     etype = type(e)
-                    msg = E(f'キー{repr(k)}は不正な値です', v, False)
+                    msg = E(f"キー{repr(k)}は不正な値です", v, False)
                     raise etype(msg)
         return value
 
 
 class VList(VContainer):
-    """適切なリストか確認するバリデータです。
-    """
+    """適切なリストか確認するバリデータです。"""
 
     def __get__(self, instance, otype) -> list:
         return super().__get__(instance, otype)
@@ -312,16 +330,18 @@ class VList(VContainer):
     def validate(self, value: Any) -> list:
         E = self.ERRMSG
         if type(value) is not list:
-            msg = E('list型である必要があります', value)
+            msg = E("list型である必要があります", value)
             raise TypeError(msg)
         if type(self.TEMPLATE) is list:
             return self._validate_of_structure(value)
         lv = len(value)
-        if (mini := self.minimum) is not None and lv < mini:
-            msg = E(f'あと{mini-lv}個設定する必要があります', value)
+        mini = self.minimum
+        if mini is not None and lv < mini:
+            msg = E(f"あと{mini-lv}個設定する必要があります", value)
             raise ValueError(msg)
-        if (maxi := self.maximum) is not None and lv > maxi:
-            msg = E(f'あと{lv-maxi}個減らす必要があります', value)
+        maxi = self.maximum
+        if maxi is not None and lv > maxi:
+            msg = E(f"あと{lv-maxi}個減らす必要があります", value)
             raise ValueError(msg)
         if isinstance(self.TEMPLATE, Validator):
             return self._validate_by_validator(value)
@@ -330,9 +350,10 @@ class VList(VContainer):
 
     def _validate_by_type(self, value) -> list:
         E = self.ERRMSG
-        vtype = self.TEMPLATE if (is_type := inspect.isclass(self.TEMPLATE)) else type(self.TEMPLATE)
+        is_type = inspect.isclass(self.TEMPLATE)
+        vtype = self.TEMPLATE if is_type else type(self.TEMPLATE)
         for i, v in enumerate(value):
-            msg = E(f'インデックス{i}は{vtype.__name__}型である必要があります', v, False)
+            msg = E(f"インデックス{i}は{vtype.__name__}型である必要があります", v, False)
             if type(v) is bool:
                 if vtype is not bool:
                     raise TypeError(msg)
@@ -341,7 +362,7 @@ class VList(VContainer):
                     raise TypeError(msg)
             else:
                 if not isinstance(v, vtype):
-                    msg = E(f'インデックス{i}は{vtype.__name__}型あるいはそのサブクラスである必要があります', v, False)
+                    msg = E(f"インデックス{i}は{vtype.__name__}型あるいはそのサブクラスである必要があります", v, False)
                     raise TypeError(msg)
         return value
 
@@ -358,17 +379,18 @@ class VList(VContainer):
                     T.validate(v)
             except Exception as e:
                 etype = type(e)
-                msg = self.ERRMSG(f'インデックス{i}は不正な値です', v, False)
+                msg = self.ERRMSG(f"インデックス{i}は不正な値です", v, False)
                 raise etype(msg)
         return value
 
     def _validate_of_structure(self, value) -> list:
         E = self.ERRMSG
-        if (diff_len := len(value) - len(self.TEMPLATE)) > 0:
-            msg = E(f'あと{diff_len}個減らす必要があります', value)
+        diff_len = len(value) - len(self.TEMPLATE)
+        if diff_len > 0:
+            msg = E(f"あと{diff_len}個減らす必要があります", value)
             raise ValueError(msg)
         if diff_len < 0:
-            msg = E(f'あと{diff_len*-1}個設定する必要があります', value)
+            msg = E(f"あと{diff_len*-1}個設定する必要があります", value)
             raise ValueError(msg)
         for i, (v, validator) in enumerate(zip(value, self.TEMPLATE)):
             if isinstance(validator, Validator):
@@ -382,11 +404,12 @@ class VList(VContainer):
                         validator.validate(v)
                 except Exception as e:
                     etype = type(e)
-                    msg = E(f'インデックス{i}は不正な値です', v, False)
+                    msg = E(f"インデックス{i}は不正な値です", v, False)
                     raise etype(msg)
             else:
-                vtype = validator if (is_type := inspect.isclass(validator)) else type(validator)
-                msg = E(f'インデックス{i}は{vtype.__name__}型である必要があります', v, False)
+                is_type = inspect.isclass(validator)
+                vtype = validator if is_type else type(validator)
+                msg = E(f"インデックス{i}は{vtype.__name__}型である必要があります", v, False)
                 if type(v) is bool:
                     if vtype is not bool:
                         raise TypeError(msg)
@@ -395,14 +418,13 @@ class VList(VContainer):
                         raise TypeError(msg)
                 else:
                     if not isinstance(v, vtype):
-                        msg = E(f'インデックス{i}は{vtype.__name__}型あるいはそのサブクラスである必要があります', v, False)
+                        msg = E(f"インデックス{i}は{vtype.__name__}型あるいはそのサブクラスである必要があります", v, False)
                         raise TypeError(msg)
         return value
 
 
 class VTuple(VContainer):
-    """適切なタプルか確認するバリデータです。
-    """
+    """適切なタプルか確認するバリデータです。"""
 
     def __get__(self, instance, otype) -> tuple:
         return super().__get__(instance, otype)
@@ -436,16 +458,18 @@ class VTuple(VContainer):
     def validate(self, value: Any) -> tuple:
         E = self.ERRMSG
         if type(value) is not tuple:
-            msg = E('tuple型である必要があります', value)
+            msg = E("tuple型である必要があります", value)
             raise TypeError(msg)
         if type(self.TEMPLATE) is tuple:
             return self._validate_of_structure(value)
         lv = len(value)
-        if (mini := self.minimum) is not None and lv < mini:
-            msg = E(f'あと{mini-lv}個設定する必要があります', value)
+        mini = self.minimum
+        if mini is not None and lv < mini:
+            msg = E(f"あと{mini-lv}個設定する必要があります", value)
             raise ValueError(msg)
-        if (maxi := self.maximum) is not None and lv > maxi:
-            msg = E(f'あと{lv-maxi}個減らす必要があります', value)
+        maxi = self.maximum
+        if maxi is not None and lv > maxi:
+            msg = E(f"あと{lv-maxi}個減らす必要があります", value)
             raise ValueError(msg)
         if isinstance(self.TEMPLATE, Validator):
             return self._validate_by_validator(value)
@@ -454,9 +478,10 @@ class VTuple(VContainer):
 
     def _validate_by_type(self, value) -> tuple:
         E = self.ERRMSG
-        vtype = self.TEMPLATE if (is_type := inspect.isclass(self.TEMPLATE)) else type(self.TEMPLATE)
+        is_type = inspect.isclass(self.TEMPLATE)
+        vtype = self.TEMPLATE if inspect.isclass(self.TEMPLATE) else type(self.TEMPLATE)
         for i, v in enumerate(value):
-            msg = E(f'インデックス{i}は{vtype.__name__}型である必要があります', v, False)
+            msg = E(f"インデックス{i}は{vtype.__name__}型である必要があります", v, False)
             if type(v) is bool:
                 if vtype is not bool:
                     raise TypeError(msg)
@@ -465,7 +490,7 @@ class VTuple(VContainer):
                     raise TypeError(msg)
             else:
                 if not isinstance(v, vtype):
-                    msg = E(f'インデックス{i}は{vtype.__name__}型あるいはそのサブクラスである必要があります', v, False)
+                    msg = E(f"インデックス{i}は{vtype.__name__}型あるいはそのサブクラスである必要があります", v, False)
                     raise TypeError(msg)
         return value
 
@@ -481,7 +506,7 @@ class VTuple(VContainer):
                 validate(v)
             except Exception as e:
                 etype = type(e)
-                msg = self.ERRMSG(f'インデックス{i}は不正な値です', v, False)
+                msg = self.ERRMSG(f"インデックス{i}は不正な値です", v, False)
                 raise etype(msg)
         return value
 
@@ -493,18 +518,19 @@ class VTuple(VContainer):
                 res.append(self.TEMPLATE.validate(v))
             except Exception as e:
                 etype = type(e)
-                msg = self.ERRMSG(f'インデックス{i}は不正な値です', v, False)
+                msg = self.ERRMSG(f"インデックス{i}は不正な値です", v, False)
                 raise etype(msg)
         return tuple(res)
 
     def _validate_of_structure(self, value) -> tuple:
         E = self.ERRMSG
         TMP = cast(tuple, self.TEMPLATE)
-        if (diff_len := len(value) - len(TMP)) > 0:
-            msg = E(f'あと{diff_len}個減らす必要があります', value)
+        diff_len = len(value) - len(TMP)
+        if diff_len > 0:
+            msg = E(f"あと{diff_len}個減らす必要があります", value)
             raise ValueError(msg)
         if diff_len < 0:
-            msg = E(f'あと{diff_len*-1}個設定する必要があります', value)
+            msg = E(f"あと{diff_len*-1}個設定する必要があります", value)
             raise ValueError(msg)
         if self.allow_convert:
             return self._validate_of_structure_allow(value)
@@ -517,11 +543,12 @@ class VTuple(VContainer):
                         validator.validate(v)
                 except Exception as e:
                     etype = type(e)
-                    msg = E(f'インデックス{i}は不正な値です', v, False)
+                    msg = E(f"インデックス{i}は不正な値です", v, False)
                     raise etype(msg)
             else:
-                vtype = validator if (is_type := inspect.isclass(validator)) else type(validator)
-                msg = E(f'インデックス{i}は{vtype.__name__}型である必要があります', v, False)
+                is_type = inspect.isclass(validator)
+                vtype = validator if is_type else type(validator)
+                msg = E(f"インデックス{i}は{vtype.__name__}型である必要があります", v, False)
                 if type(v) is bool:
                     if vtype is not bool:
                         raise TypeError(msg)
@@ -530,7 +557,7 @@ class VTuple(VContainer):
                         raise TypeError(msg)
                 else:
                     if not isinstance(v, vtype):
-                        msg = E(f'インデックス{i}は{vtype.__name__}型あるいはそのサブクラスである必要があります', v, False)
+                        msg = E(f"インデックス{i}は{vtype.__name__}型あるいはそのサブクラスである必要があります", v, False)
                         raise TypeError(msg)
         return value
 
@@ -547,11 +574,12 @@ class VTuple(VContainer):
                         validator.validate(v)
                 except Exception as e:
                     etype = type(e)
-                    msg = E(f'インデックス{i}は不正な値です', v, False)
+                    msg = E(f"インデックス{i}は不正な値です", v, False)
                     raise etype(msg)
             else:
-                vtype = validator if (is_type := inspect.isclass(validator)) else type(validator)
-                msg = E(f'インデックス{i}は{vtype.__name__}型である必要があります', v, False)
+                is_type = inspect.isclass(validator)
+                vtype = validator if is_type else type(validator)
+                msg = E(f"インデックス{i}は{vtype.__name__}型である必要があります", v, False)
                 if type(v) is bool:
                     if vtype is not bool:
                         raise TypeError(msg)
@@ -560,7 +588,7 @@ class VTuple(VContainer):
                         raise TypeError(msg)
                 else:
                     if not isinstance(v, vtype):
-                        msg = E(f'インデックス{i}は{vtype.__name__}型あるいはそのサブクラスである必要があります', v, False)
+                        msg = E(f"インデックス{i}は{vtype.__name__}型あるいはそのサブクラスである必要があります", v, False)
                         raise TypeError(msg)
             res.append(v)
         return tuple(res)

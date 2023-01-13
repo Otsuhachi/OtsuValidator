@@ -1,12 +1,21 @@
 """単体でもディスクリプタとしても使用できるバリデータライブラリです。
+
+    以下で紹介されているクラスは対応するモジュールからインポートしてください。
+
+    base:
+        CNoneable
+        CNumerical
+        Converter
+        Validator
+        VContainer
 """
 
 
 __all__ = (
-    "CNoneable",
     "CBool",
     "CFloat",
     "CInt",
+    "CNoneable",
     "CNumber",
     "CPath",
     "CString",
