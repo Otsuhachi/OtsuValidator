@@ -1,3 +1,18 @@
+"""基本的なコンバータを纏めたモジュールです。
+"""
+
+
+__all__ = (
+    "CBool",
+    "CFloat",
+    "CInt",
+    "CNumber",
+    "CPath",
+    "CString",
+    "CTimedelta",
+)
+
+
 import re
 
 from datetime import timedelta
@@ -74,12 +89,12 @@ class CBool(VBool, Converter):
         if (tv := type(value)) is str:
             value = cast(str, value)
             value = value.lower()
-            if value in (yes := ('true', 'yes', 'y', '1')):
+            if value in (yes := ("true", "yes", "y", "1")):
                 value = True
-            elif value in (no := ('false', 'no', 'n', '0')):
+            elif value in (no := ("false", "no", "n", "0")):
                 value = False
             else:
-                msg = E(f'{yes}または{no}のいずれかである必要があります', value)
+                msg = E(f"{yes}または{no}のいずれかである必要があります", value)
                 raise ValueError(msg)
         elif tv is int:
             if value == 1:
@@ -87,7 +102,7 @@ class CBool(VBool, Converter):
             elif value == 0:
                 value = False
             else:
-                msg = E('1または0である必要があります', value)
+                msg = E("1または0である必要があります", value)
                 raise ValueError(msg)
         elif tv is float:
             if value == 1.0:
@@ -95,12 +110,12 @@ class CBool(VBool, Converter):
             elif value == 0.0:
                 value = False
             else:
-                msg = E('1.0または0.0である必要があります', value)
+                msg = E("1.0または0.0である必要があります", value)
                 raise ValueError(msg)
         elif tv is bool:
             pass
         else:
-            msg = E('Yes/Noとして解釈できる必要があります', value)
+            msg = E("Yes/Noとして解釈できる必要があります", value)
             raise TypeError(msg)
         return super().validate(value)
 
@@ -130,7 +145,7 @@ class CNumber(VNumber, CNumerical):
             i = self.try_int(value)
             f = self.try_float(value)
             if i is None and f is None:
-                msg = E('数値として扱える必要があります', value)
+                msg = E("数値として扱える必要があります", value)
                 raise TypeError(msg)
             if i is not None and f is not None:
                 value = i if i == f else f
@@ -162,7 +177,7 @@ class CFloat(VFloat, CNumerical):
         if type(value) is not float:
             convalue = self.try_float(value)
             if convalue is None:
-                msg = self.ERRMSG('float型として扱える必要があります', value)
+                msg = self.ERRMSG("float型として扱える必要があります", value)
                 raise TypeError(msg)
             value = convalue
         return super().validate(value)
@@ -181,7 +196,7 @@ class CInt(VInt, CNumerical):
         if type(value) is not int:
             convalue = self.try_int(value)
             if convalue is None:
-                msg = self.ERRMSG('int型として扱える必要があります', value)
+                msg = self.ERRMSG("int型として扱える必要があります", value)
                 raise TypeError(msg)
             value = convalue
         return super().validate(value)
@@ -201,7 +216,7 @@ class CPath(VPath, Converter):
             try:
                 value = Path(value)
             except:
-                msg = self.ERRMSG('Path型として扱える必要があります', value)
+                msg = self.ERRMSG("Path型として扱える必要があります", value)
                 raise TypeError(msg)
         return super().validate(value)
 
@@ -220,7 +235,7 @@ class CString(VString, Converter):
             try:
                 value = str(value)
             except:
-                msg = self.ERRMSG('str型として扱える必要があります', value)
+                msg = self.ERRMSG("str型として扱える必要があります", value)
                 raise TypeError(msg)
         return super().validate(value)
 
@@ -233,8 +248,9 @@ class CTimedelta(VTimedelta, Converter):
 
     timedelta型に変換可能なオブジェクトは例外を投げずに変換を行います。
     """
-    cmp_timedelta = re.compile('(\\d+ ?days?,? ?)?(\\d+):(\\d+):(\\d+)(\\.\\d+)?')
-    cmp_days = re.compile('(\\d+) ?days?,? ?')
+
+    cmp_timedelta = re.compile("(\\d+ ?days?,? ?)?(\\d+):(\\d+):(\\d+)(\\.\\d+)?")
+    cmp_days = re.compile("(\\d+) ?days?,? ?")
 
     def validate(self, value: Any) -> timedelta:
         f = None
@@ -248,7 +264,7 @@ class CTimedelta(VTimedelta, Converter):
             if f is not None:
                 value = f(value)
         except:
-            msg = self.ERRMSG('timedelta型として扱える必要があります', value)
+            msg = self.ERRMSG("timedelta型として扱える必要があります", value)
             raise TypeError(msg)
         return super().validate(value)
 
@@ -263,15 +279,15 @@ class CTimedelta(VTimedelta, Converter):
 
     def __try_convert_str(self, value: str) -> timedelta:
         if (match := self.cmp_timedelta.match(value)) is not None:
-            keys = ('days', 'hours', 'minutes', 'seconds', 'microseconds')
+            keys = ("days", "hours", "minutes", "seconds", "microseconds")
             d = {}
             for k, v in zip(keys, match.groups()):
                 if v is None:
                     continue
-                if k == 'days':
+                if k == "days":
                     if (find := self.cmp_days.match(v)) is not None:
                         v = find.groups()[0]
-                elif k == 'microseconds':
+                elif k == "microseconds":
                     v = v[1:]
                 v = int(v)
                 d[k] = v
