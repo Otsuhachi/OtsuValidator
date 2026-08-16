@@ -1,10 +1,37 @@
-__version__ = "1.1.0.312"
+__version__ = "1.1.1.312"
+__all__ = (
+    "CBool",
+    "CFloat",
+    "CInt",
+    "CNumerical",
+    "CPath",
+    "CString",
+    "CTimedelta",
+    "VAny",
+    "VBool",
+    "VChain",
+    "VChoice",
+    "VDict",
+    "VFloat",
+    "VInt",
+    "VList",
+    "VNone",
+    "VNumerical",
+    "VPath",
+    "VRange",
+    "VSequence",
+    "VString",
+    "VTimedelta",
+    "VTuple",
+    "VType",
+)
+
+
 from .bases import VChain
 from .converters import (
     CBool,
     CFloat,
     CInt,
-    CNumber,
     CNumerical,
     CPath,
     CString,
@@ -19,10 +46,9 @@ from .validators import (
     VInt,
     VList,
     VNone,
-    VNumber,
+    VNumerical,
     VPath,
     VRange,
-    VRegex,
     VSequence,
     VString,
     VTimedelta,

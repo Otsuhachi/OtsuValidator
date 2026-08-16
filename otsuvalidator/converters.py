@@ -19,7 +19,7 @@ from typing import Any, Literal, override
 
 from .bases import Converter
 from .types import FLOAT_INT, StrPath
-from .validators import VBool, VFloat, VInt, VNumber, VPath, VString, VTimedelta
+from .validators import VBool, VNumerical, VPath, VString, VTimedelta
 
 
 class CBool(VBool, Converter[Any, bool]):
@@ -82,9 +82,9 @@ class CBool(VBool, Converter[Any, bool]):
         elif tv is str:
             tmp_value: str
             tmp_value = tmp_value.lower()
-            if tmp_value in (yes := ("true", "yes", "y", "1")):
+            if tmp_value in (yes := ("true", "yes", "y", "1", "1.0")):
                 tmp_value = True  # type: ignore
-            elif tmp_value in (no := ("false", "no", "n", "0")):
+            elif tmp_value in (no := ("false", "no", "n", "0", "0.0")):
                 tmp_value = False  # type: ignore
             else:
                 msg = f"{yes}または{no}のいずれかである必要があります。\n{tmp_value=}"
@@ -111,7 +111,7 @@ class CBool(VBool, Converter[Any, bool]):
         return super().validate(tmp_value)
 
 
-class CNumerical[OutT: FLOAT_INT](VNumber[OutT], Converter[Any, OutT]):
+class CNumerical[OutT: FLOAT_INT](VNumerical[OutT], Converter[Any, OutT]):
     """
     数値を変換し、範囲を検証するコンバータの基底クラス。
     """
@@ -143,7 +143,11 @@ class CNumerical[OutT: FLOAT_INT](VNumber[OutT], Converter[Any, OutT]):
                 else:
                     converted = f_val
             else:
-                converted = t_type(value)
+                converted = tmp_value = float(value)
+                if t_type is not float:
+                    converted = t_type(tmp_value)
+                if converted != tmp_value:
+                    raise ValueError(f"変換後の数値が元の数値と等価ではありません。{value} != {converted}")
         except (TypeError, ValueError):
             type_name = t_type.__name__ if t_type else "number"
             msg = f"'{self.public_name}'を{type_name}に変換できませんでした: {value!r}。"

@@ -15,7 +15,7 @@ license = { text = "MIT License" }
 name = "otsuvalidator"
 readme = "README.md"
 requires-python = ">=3.12"
-version = "1.1.0.312"
+version = "1.1.1.312"
 
 [tool.setuptools.packages.find]
 include = ["otsuvalidator*"]

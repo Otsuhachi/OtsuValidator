@@ -4,6 +4,8 @@ __all__ = (
     "VChain",
     "VContainer",
 )
+
+
 from abc import ABC, abstractmethod
 from typing import Any, Literal, Self, overload
 
@@ -26,6 +28,7 @@ class Validator[OutT](ABC):
 
     @overload
     def __get__(self, instance: Any, owner: type[Any]) -> OutT: ...
+
     def __get__(self, instance: Any | None, owner: type[Any]) -> OutT | Self:
         # クラス属性としてアクセスされた場合
         # 例: MyClass.age

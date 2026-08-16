@@ -7,7 +7,7 @@ __all__ = (
     "VInt",
     "VList",
     "VNone",
-    "VNumber",
+    "VNumerical",
     "VPath",
     "VRange",
     "VRegex",
@@ -31,7 +31,7 @@ from .bases import Validator, VContainer
 from .types import FLOAT_INT, Comparable
 
 
-class VNumber[OutT: FLOAT_INT](Validator[OutT]):
+class VNumerical[OutT: FLOAT_INT](Validator[OutT]):
     """数値の範囲を検証するバリデータ。"""
 
     def __init__(
@@ -62,6 +62,24 @@ class VNumber[OutT: FLOAT_INT](Validator[OutT]):
             msg = f"'{pn}'は{mv}以下である必要があります。"
             raise ValueError(msg)
         return value
+
+
+class VNumber[OutT: FLOAT_INT](VNumerical[OutT]):
+    """
+    [非推奨]VNumberは非推奨です。将来のバージョンで削除されます。
+    代わりにVNumericalを使用してください。
+    """
+
+    def __init__(
+        self,
+        min_val: OutT | None = None,
+        max_val: OutT | None = None,
+        *,
+        type_strict: bool = False,
+    ) -> None:
+        msg = "VNumberは非推奨です。代わりにVNumericalを使用してください。"
+        warnings.warn(msg, DeprecationWarning, stacklevel=2)
+        super().__init__(min_val, max_val, type_strict=type_strict)
 
 
 class VSequence[OutT](VContainer[OutT]):
@@ -203,7 +221,7 @@ class VDict[InT, OutT](VContainer[dict[InT, OutT]]):
         return validated_dict
 
 
-class VFloat(VNumber[float]):
+class VFloat(VNumerical[float]):
     """浮動小数点数専用のバリデータ。"""
 
     def __init__(
@@ -220,7 +238,7 @@ class VFloat(VNumber[float]):
             raise TypeError(msg)
 
 
-class VInt(VNumber[int]):
+class VInt(VNumerical[int]):
     """整数専用のバリデータ。"""
 
     def __init__(
