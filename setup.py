@@ -1,10 +1,10 @@
 from setuptools import find_packages, setup
 
-__VERSION__ = "2.0.1"
+__VERSION__ = "1.1.0.312"
 
-with open("README.md", "r", encoding="utf-8") as f:
+with open("README.md", encoding="utf-8") as f:
     readme = f.read()
-with open("LICENSE.txt", "r", encoding="utf-8") as f:
+with open("LICENSE.txt", encoding="utf-8") as f:
     lcs = f.read()
 
 setup(
@@ -20,5 +20,5 @@ setup(
     include_package_data=True,
     license=lcs,
     keywords="Python validator descriptor converter",
-    python_requires=">=3.8",
+    python_requires=">=3.12",
 )

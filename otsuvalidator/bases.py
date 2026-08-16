@@ -1,231 +1,137 @@
-"""バリデータやコンバータの基底クラスを纏めたモジュールです。
-
-新しくバリデータ、コンバータクラスを作成する場合にはそれぞれValidator, Convertorクラスを継承してください。
-"""
-
 __all__ = (
-    "CNoneable",
-    "CNumerical",
     "Converter",
     "Validator",
+    "VChain",
     "VContainer",
 )
-
-
 from abc import ABC, abstractmethod
-from typing import Any, Optional, Union
+from typing import Any, Literal, Self, overload
 
 
-class Validator(ABC):
-    """すべてのバリデータの基底クラスです。
+class Validator[OutT](ABC):
+    def __init__(self) -> None:
+        self.public_name: str = ""
+        self.private_name: str = ""
 
-    このクラスを継承してvalidateメソッドを定義してください。
+    def __set_name__(self, owner: type[Any], name: str) -> None:
+        """クラス定義時に自動的に呼び出される。
 
-    またvalidateメソッドは検証を通過したvalueを返すようにしてください。
-    これはコンバータ等に流用するときのためです。
-    """
+        例: `age = Validator()`と書くと`name`に"age"が入る。
+        """
+        self.public_name = name
+        self.private_name = f"_{name}"
 
-    def __set_name__(self, cls, name):
-        self.name = name
-        self.private_name = "_" + name
+    @overload
+    def __get__(self, instance: None, owner: type[Any]) -> Self: ...
 
-    def __get__(self, instance, otype):
+    @overload
+    def __get__(self, instance: Any, owner: type[Any]) -> OutT: ...
+    def __get__(self, instance: Any | None, owner: type[Any]) -> OutT | Self:
+        # クラス属性としてアクセスされた場合
+        # 例: MyClass.age
+        if instance is None:
+            return self
+        # インスタンス属性としてアクセスされた場合
+        # myc_instance.age
         return getattr(instance, self.private_name)
 
-    def __set__(self, instance, value):
-        value = self.validate(value)
-        setattr(instance, self.private_name, value)
+    def set_name(self, name: str) -> None:
+        """バリデータの表示名を動的に設定する。"""
+        self.public_name = name
+        self.private_name = f"_{name}"
 
     @abstractmethod
-    def validate(self, value: Any) -> Any:
-        """valueが指定した形式に従っているかをチェックします。
-
-        チェックが通過した場合にはvalueをそのまま返します。
-        また、チェックに通過できなかった場合にはその状況に応じた例外が投げられます。
-
-        Args:
-            value (Any): チェックするオブジェクト。
-
-        Returns:
-            Any: value。
+    def validate(self, value: Any) -> OutT:
         """
-        pass
-
-    def ERRMSG(self, text: str, cause: Any, is_attribute: bool = True) -> str:
-        """エラーメッセージを生成します。
-
-        エラーメッセージは以下の形式となります。
-        is_attribute=True: '<属性"{name}"は>{text}。({rv}: {type(cause).__name__})'
-        is_attribute=False: '{text}。({rv}: {type(cause).__name__})
-
-        rvはrepr(value)ですが、50文字以上になる場合は先頭と末尾の10文字を'...'で挟んだ形式になります。
-        <属性{name}は>部分はディスクリプタとして使用されている場合かつ、is_attributeがTrueの時に表示されます。
-
-        Args:
-            text (str): 基本のエラーメッセージです。
-            cause (Any): 原因となったオブジェクトです。
-            is_attribute (bool, optional): 属性で発生したエラーです。
-
-        Returns:
-            str: エラーメッセージです。
+        [抽象メソッド] 子クラスで必ず実装する必要がある。
+        値が正しければその値を返し、不正なら例外を投げる。
         """
-        text = text.rstrip("。")
-        if is_attribute and hasattr(self, "private_name"):
-            text = f"属性{repr(self.name)}は" + text
-        rv = repr(cause)
-        if len(rv) > 50:
-            rv = rv[:10] + "..." + rv[-10:]
-        text += f"。({rv}: {type(cause).__name__})"
-        return text
+        raise NotImplementedError()
+
+    def __set__(self, instance: Any, value: Any) -> None:
+        """値を代入する際に呼び出される。
+
+        `validate`メソッドでチェックを通った値のみ保持する。
+        """
+        # 1. 値を検証(子クラスの実装を呼び出す。)
+        validated_value = self.validate(value)
+        # 2. private_nameでインスタンスに保存
+        setattr(instance, self.private_name, validated_value)
+
+    def __or__[NextOutT](self, other: "Validator[NextOutT]") -> "VChain[NextOutT]":
+        """パイプ演算子によるバリデータの直列連結をサポートする。"""
+        return VChain(self, other)
 
 
-class VContainer(Validator):
-    """コンテナオブジェクト用バリデータの基底クラスです。
+class Converter[InT, OutT](Validator[OutT]):
+    """値を特定の型や形式に変換するディスクリプタの基底クラス。"""
 
-    __set__を経由せずに内容が書き換わる可能性があるので、__get__時に再検証を行うオプションmonitoring_overwriteを持ちます。
-    入れ子構造のコンテナバリデータは、親の検証が行われる際に検証されてしまうので、このオプションは実質的に親の設定が伝播します。
+    @abstractmethod
+    def validate(self, value: InT) -> OutT:
+        """入力値を変換して返すロジックを実装する。"""
+        raise NotImplementedError()
+
+    def super_validate(self, value: Any) -> OutT:
+        """変換を行わず、スーパークラスの検証のみを行う。"""
+        return super().validate(value)  # type: ignore
+
+
+class VChain[OutT](Validator[OutT]):
+    """複数のバリデータを直列に実行するクラス。"""
+
+    def __init__(self, *validators: Validator[Any], pass_type: Literal["all", "any"] = "any") -> None:
+        super().__init__()
+        self.validators: tuple[Validator[Any], ...] = validators
+        self.pass_type: Literal["all", "any"] = pass_type
+
+    def validate(self, value: Any) -> OutT:
+        current_value = value
+        validators = self.validators
+        if self.pass_type == "all":
+            for validator in validators:
+                current_value = validator.validate(current_value)
+        else:
+            passed = False
+            exceptions = []
+            for validator in validators:
+                try:
+                    tmp = validator.validate(current_value)
+                    current_value = tmp
+                    passed = True
+                except Exception as ex:
+                    exceptions.append(ex)
+            if not passed:
+                raise ValueError(*exceptions)
+        return current_value
+
+    def __or__[NextOutT](self, other: Validator[NextOutT]) -> "VChain[NextOutT]":
+        return VChain(*self.validators, other)
+
+
+class VContainer[OutT](Validator[OutT]):
+    """
+    VDict, VList, VTuple などの構造を持つバリデータの基底クラス。
+    スキーマの保持や、動的な再検証フラグの管理を行う。
     """
 
-    def __init__(self, TEMPLATE: Any, monitoring_overwrite: bool = True, allow_convert: bool = True) -> None:
-        """雛形、アクセス時に再検証を行うか、変換を許可するかを設定してバリデータを生成します。
-
-        変換を許可する場合、元のコンテナまたはコンテナ内の要素は異なるidを持つ場合があります。
-
-        Args:
-            TEMPLATE (Any): 雛形です。継承後のクラスによって異なります。
-            monitoring_overwrite (bool, optional): アクセス時に再検証を行うかどうかです。要素数などによっては時間がかかる場合があります。不変であることが保証されている場合には無効にしてください。
-            allow_convert (bool, optional): コンバータによる要素の変換を許可するかどうかです。
-        """
-        self.TEMPLATE = TEMPLATE
+    def __init__(
+        self,
+        schema: Any,
+        *,
+        monitoring_overwrite: bool = False,
+    ) -> None:
+        super().__init__()
+        self.schema = schema
         self.monitoring_overwrite = monitoring_overwrite
-        self.allow_convert = allow_convert
 
-    def __get__(self, instance, otype) -> Any:
-        res = super().__get__(instance, otype)
+    def __get__(self, instance: Any | None, owner: type[Any]) -> OutT | Self:  # type: ignore
+        """
+        monitoring_overwrite が True の場合、
+        値を取得する際にも再検証を実行するようにオーバーライド。
+        """
+        if instance is None:
+            return self
+        value = getattr(instance, self.private_name)
         if self.monitoring_overwrite:
-            res = self.validate(res)
-        return res
-
-
-class Converter(Validator):
-    """すべてのコンバータの基底クラスです。
-
-    バリデータとこのクラスを継承してsuper_validateメソッドを定義してください。
-    """
-
-    @abstractmethod
-    def super_validate(self, value: Any) -> Any:
-        """スーパークラスのvalidateを使用して検証を行います。
-
-        即ち、変換を行いたくない場合に使用します。
-        このメソッドはコンテナバリデータ等で中身の変換を拒否したい場合に使用されます。
-
-        Args:
-            value (Any): 検証する値です。
-
-        Returns:
-            Any: 検証を通過した値です。
-        """
-        pass
-
-
-class CNoneable(Converter):
-    """バリデータまたはコンバータにNoneを含めることを許可するクラスです。"""
-
-    def __init__(self, validator: Union[Validator, Converter], monitoring_overwrite: bool = True) -> None:
-        """バリデータ、コンバータのインスタンスを渡し、追加でNoneを許可するようにします。
-
-        Args:
-            validator (Union[Validator, Converter]): バリデータまたはコンバータです。
-            monitoring_overwrite (bool, optional): アクセス時に再検証を行うかどうかです。要素数などによっては時間がかかる場合があります。不変であることが保証されている場合には無効にしてください。
-        """
-        self.validator = validator
-        self.monitoring_overwrite = monitoring_overwrite
-
-    def __get__(self, instance, otype):
-        res = super().__get__(instance, otype)
-        if res is None:
-            return res
-        if getattr(self.validator, "monitoring_overwrite", None):
-            res = self.validator.validate(res)
-        return res
-
-    def validate(self, value: Any) -> Any:
-        """Noneを通し、それ以外を本来のvalidator.validateを使用して検証を行います。
-
-        Args:
-            value (Any): 検証する値です。
-
-        Returns:
-            Any: 検証を通過した値です。
-        """
-        if value is None:
-            return None
-        return self.validator.validate(value)
-
-    def super_validate(self, value: Any) -> Any:
-        """Noneを通し、それ以外を本来のvalidator.super_validateを使用して検証を行います。
-
-        validatorがコンバータでない場合、validator.validateを使用して検証を行います。
-
-        Args:
-            value (Any): 検証する値です。
-
-        Returns:
-            Any: 検証を通過した値です。
-        """
-        if value is None:
-            return None
-        if isinstance(self.validator, Converter):
-            return self.validator.super_validate(value)
-        self.validator.validate(value)
-
-
-class CNumerical(Converter):
-    """数値型用コンバータの基底クラスです。
-
-    (int, float)に変換を試みるメソッドが定義されています。
-
-    Args:
-        Converter ([type]): [description]
-    """
-
-    @staticmethod
-    def try_int(value: Any) -> Optional[int]:
-        """intへの変換を試みます。
-
-        Args:
-            value (Any): 変換を試みたい値です。
-
-        Returns:
-            Optional[int]: int変換されたvalueまたはNoneです。
-        """
-        if type(value) is int:
-            return value
-        try:
-            return int(value)
-        except:
-            try:
-                return int(float(value))
-            except:
-                return None
-
-    @staticmethod
-    def try_float(value: Any) -> Optional[float]:
-        """floatへの変換を試みます。
-
-        Args:
-            value (Any): 変換を試みたい値です。
-
-        Returns:
-            Optional[float]: float変換されたvalueまたはNoneです。
-        """
-        if type(value) is float:
-            return value
-        try:
-            return float(value)
-        except:
-            try:
-                return float(int(value))
-            except:
-                return None
+            return self.validate(value)
+        return value

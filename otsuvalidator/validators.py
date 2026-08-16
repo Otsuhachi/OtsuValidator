@@ -1,574 +1,490 @@
-"""基本的なバリデータを纏めたモジュールです。
-"""
-
 __all__ = (
+    "VAny",
     "VBool",
     "VChoice",
     "VDict",
     "VFloat",
     "VInt",
     "VList",
+    "VNone",
     "VNumber",
     "VPath",
+    "VRange",
     "VRegex",
+    "VSequence",
     "VString",
     "VTimedelta",
     "VTuple",
+    "VType",
+    "_ensure_validator",
 )
 
 
-import inspect
 import re
-
+import warnings
+from collections.abc import Callable, Container, Hashable, Iterable
 from datetime import timedelta
 from pathlib import Path
-from typing import Any, Callable, Optional, Union, cast, overload
+from typing import Any, Literal, override
 
-from .bases import Converter, Validator, VContainer
-
-
-class VBool(Validator):
-    """真偽値かどうかを確認するバリデータです。"""
-
-    def __get__(self, instance, otype) -> bool:
-        return super().__get__(instance, otype)
-
-    def validate(self, value: Any) -> bool:
-        if type(value) is not bool:
-            msg = self.ERRMSG("bool型である必要があります", value)
-            raise TypeError(msg)
-        return value
+from .bases import Validator, VContainer
+from .types import FLOAT_INT, Comparable
 
 
-class VChoice(Validator):
-    """選択肢の中から1つが選択されているかどうかを確認するバリデータです。"""
+class VNumber[OutT: FLOAT_INT](Validator[OutT]):
+    """数値の範囲を検証するバリデータ。"""
 
-    def __init__(self, *options: Any) -> None:
-        """選択肢を設定し、バリデータを生成します。"""
-        if not options:
-            msg = self.ERRMSG("1つ以上のoptionsを設定してください", options, False)
+    def __init__(
+        self,
+        min_val: OutT | None = None,
+        max_val: OutT | None = None,
+        *,
+        type_strict: bool = False,
+    ) -> None:
+        super().__init__()
+        self.min_val = min_val
+        self.max_val = max_val
+        self.type_strict = type_strict
+
+    def _check_type(self, value: Any) -> None:
+        """標準的な数値チェック（サブクラスでオーバーライドされることを想定）。"""
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            raise TypeError(f"'{self.public_name}'は数値(boolを除く)である必要があります。")
+
+    @override
+    def validate(self, value: Any) -> OutT:
+        self._check_type(value)
+        pn = self.public_name
+        if (mv := self.min_val) is not None and value < mv:
+            msg = f"'{pn}'は{mv}以上である必要があります。"
             raise ValueError(msg)
-        self.options = set(options)
-
-    def validate(self, value: Any) -> Any:
-        if value not in self.options:
-            msg = self.ERRMSG(f"{self.options}のいずれかである必要があります", value)
-            raise ValueError(msg)
-        return value
-
-
-class VNumber(Validator):
-    """適切な数値かどうかを確認するバリデータです。"""
-
-    def __init__(self, minimum: Optional[Union[int, float]] = None, maximum: Optional[Union[int, float]] = None) -> None:
-        """下限値と上限値を指定してバリデータを生成します。
-
-        Args:
-            minimum (Optional[Union[int, float]], optional): 下限値です。
-            maximum (Optional[Union[int, float]], optional): 上限値です。
-        """
-        self.minimum = minimum
-        self.maximum = maximum
-
-    @overload
-    def validate(self, value: int) -> int:
-        ...
-
-    @overload
-    def validate(self, value: float) -> float:
-        ...
-
-    def validate(self, value: Any) -> Any:
-        E = self.ERRMSG
-        if type(value) not in (int, float):
-            msg = E("(int, float)型のいずれかである必要があります", value)
-            raise TypeError(msg)
-        if (mini := self.minimum) is not None and value < mini:
-            msg = E(f"{mini}より小さい値を設定することはできません", value)
-            raise ValueError(msg)
-        if (maxi := self.maximum) is not None and value > maxi:
-            msg = E(f"{maxi}より大きい値を設定することはできません", value)
+        if (mv := self.max_val) is not None and value > mv:
+            msg = f"'{pn}'は{mv}以下である必要があります。"
             raise ValueError(msg)
         return value
 
 
-class VFloat(VNumber):
-    """適切な浮動小数点数かどうかを確認するバリデータです。"""
+class VSequence[OutT](VContainer[OutT]):
+    """VList と VTuple の共通基盤。"""
 
-    def __get__(self, instance, otype) -> float:
-        return super().__get__(instance, otype)
-
-    def validate(self, value: Any) -> float:
-        if type(value) is not float:
-            msg = self.ERRMSG("float型である必要があります", value)
-            raise TypeError(msg)
-        return super().validate(value)
-
-
-class VInt(VNumber):
-    """適切な整数かどうかを確認するバリデータです。"""
-
-    def __get__(self, instance, otype) -> int:
-        return super().__get__(instance, otype)
-
-    def validate(self, value: Any) -> int:
-        if type(value) is not int:
-            msg = self.ERRMSG("int型である必要があります", value)
-            raise TypeError(msg)
-        return super().validate(value)
-
-
-class VPath(Validator):
-    """適切なパスかどうかを確認するバリデータです。"""
-
-    def __get__(self, instance, otype) -> Path:
-        return super().__get__(instance, otype)
-
-    def __init__(self, *suffix: str, exist_only: bool = False, path_type: Optional[Callable[[Path], bool]] = None) -> None:
-        """許可する拡張子とパスの存在確認を行うかを設定し、バリデータを生成します。
-
-        拡張子は複数許可することもできます。
-        また、先頭の'.'はあってもなくても等価です。
-        '.txt' == 'txt'
-
-        Args:
-            exist_only (bool, optional): 有効にすると、存在しないパスに対して例外を投げます。
-            path_type (Optional[Callable[[Path], bool]], optional): パスのタイプを判定し、一致しない場合に例外を発生させます。Path.is_dir, Path.is_fileなどを渡すことを想定しています。
-        """
-        self.path_type = path_type
-        self.exist_only = exist_only
-        self.suffix = tuple(set(map(lambda x: "." + x.lstrip(".") if x else x, suffix)))
-
-    def validate(self, value: Any) -> Path:
-        E = self.ERRMSG
-        if not isinstance(value, Path):
-            msg = E("Path型である必要があります", value)
-            raise TypeError(msg)
-        if sf := self.suffix:
-            if value.suffix not in sf:
-                msg = E(f"拡張子が{sf[0]}である必要があります" if len(sf) == 1 else f"拡張子が{sf}のいずれかである必要があります", value)
-                raise ValueError(msg)
-        if value.exists():
-            if (pt := self.path_type) is not None and not pt(value):
-                msg = E(f"{pt}がTrueを返すパスである必要があります", value)
-                raise FileExistsError(msg)
+    def __init__(
+        self,
+        item_schema: Any,
+        *,
+        min_len: int | None = None,
+        max_len: int | None = None,
+        monitoring_overwrite: bool = False,
+    ) -> None:
+        # スキーマがリストやタプル(集合)か、単一の定義かを判定
+        self.is_zip_mode = isinstance(item_schema, (list, tuple))
+        if self.is_zip_mode:
+            # 個別適用モード: zip(value, schema)で検証
+            schema = tuple(_ensure_validator(s) for s in item_schema)
         else:
-            if self.exist_only:
-                msg = E("存在するパスである必要があります", value)
-                raise FileNotFoundError(msg)
+            # 一律適用モード: 全ての要素に同じバリデータを適用
+            schema = _ensure_validator(item_schema)
+        super().__init__(schema=schema, monitoring_overwrite=monitoring_overwrite)
+        self.min_len = min_len
+        self.max_len = max_len
+
+    def _validate_items(self, value: Iterable[Any]) -> list[Any]:
+        """中身のバリデーションを実行する。"""
+        # 要素数の判定
+        value = list(value)
+        length = len(value)
+        pn = self.public_name
+        if (ml := self.min_len) is not None and length < ml:
+            msg = f"'{pn}'の要素数は{ml}以上である必要があります。"
+            raise ValueError(msg)
+        if (ml := self.max_len) is not None and length > ml:
+            msg = f"'{pn}'の要素数は{ml}以下である必要があります。"
+            raise ValueError(msg)
+        if self.is_zip_mode:
+            # 個別適用
+            validators: tuple[Validator[Any], ...] = self.schema
+            if len(validators) != length:
+                msg = f"'{pn}'の要素数（{length}）が定義されたスキーマの数（{len(validators)}）と一致しません。"
+                raise ValueError(msg)
+            return [v.validate(x) for v, x in zip(validators, value, strict=False)]
+        else:
+            # 一律適用
+            validator: Validator[Any] = self.schema
+            return [validator.validate(item) for item in value]
+
+
+class VAny(Validator[Any]):
+    """全ての値を許容するバリデータ。"""
+
+    @override
+    def validate(self, value: Any) -> Any:
         return value
 
 
-class VString(Validator):
-    """適切な文字列かどうかを確認するバリデータです。"""
+class VBool(Validator[bool]):
+    """真偽値であることを検証するバリデータ。"""
 
-    def __get__(self, instance, otype) -> str:
-        return super().__get__(instance, otype)
+    @override
+    def validate(self, value: Any) -> bool:
+        if (tv := type(value)) is not bool:
+            msg = f"'{self.public_name}'はboolean型である必要があります（指定された型: {tv.__name__}）。"
+            raise TypeError(msg)
+        return value
 
-    def __init__(self, minimum: Optional[int] = None, maximum: Optional[int] = None, checker: Optional[Callable[[str], bool]] = None) -> None:
-        """最低文字数、最大文字数、確認関数を設定してバリデータを生成します。
 
-        Args:
-            minimum (Optional[int], optional): 最低文字数です。
-            maximum (Optional[int], optional): 最大文字数です。
-            checker (Optional[Callable[[str],bool]], optional): 指定した形式であるかを返す関数です。
-        """
-        self.minimum = minimum
-        self.maximum = maximum
+class VChoice[OutT](Validator[OutT]):
+    """特定の値の選択肢に含まれているかを検証するバリデータ。"""
+
+    def __init__(self, choices: Iterable[OutT]) -> None:
+        super().__init__()
+        try:
+            self.choices: Container[OutT] = set(choices)
+        except TypeError:
+            self.choices = tuple(choices)
+
+    @override
+    def validate(self, value: Any) -> OutT:
+        choices = self.choices
+        if value not in choices:
+            msg = f"'{self.public_name}'は{choices}のいずれかである必要があります。"
+            raise ValueError(msg)
+        return value
+
+
+class VDict[InT, OutT](VContainer[dict[InT, OutT]]):
+    """
+    辞書の構造を検証するバリデータ。
+    スキーマに基づき、キーごとの検証を行う。
+    """
+
+    def __init__(
+        self,
+        schema: dict[Hashable, Any],
+        *,
+        allow_missing: bool = False,  # キーが足りなくてもOKか
+        allow_extra: bool = False,  # 未知のキーがあってもOKか
+        monitoring_overwrite: bool = False,
+    ) -> None:
+        normalized_schema = {k: _ensure_validator(v) for k, v in schema.items()}
+        super().__init__(
+            schema=normalized_schema,
+            monitoring_overwrite=monitoring_overwrite,
+        )
+        self.allow_missing = allow_missing
+        self.allow_extra = allow_extra
+
+    @override
+    def validate(self, value: Any) -> dict[InT, OutT]:
+        pn = self.public_name
+        if not isinstance(value, dict):
+            msg = f"'{pn}'はdict型である必要があります（指定された型: {type(value).__name__}）。"
+            raise TypeError(msg)
+        validated_dict: dict[InT, OutT] = {}
+        schema: dict[InT, Validator[OutT]] = self.schema
+
+        # 1. スキーマに定義されているキーの検証
+        for k, v in schema.items():
+            if k in value:
+                v.set_name(f"{pn}[{k!r}]")
+                validated_dict[k] = v.validate(value[k])
+            elif not self.allow_missing:
+                msg = f"'{pn}'に必須キー{k!r}が存在しません。"
+                raise KeyError(msg)
+
+        # 2. スキーマにない未知のキーハンドリング
+        if self.allow_extra:
+            for k, v in value.items():
+                if k not in schema:
+                    validated_dict[k] = v
+        elif any(k not in schema for k in value):
+            # 許可されていないキーがある場合、見つけたものを通知
+            extra_keys = [k for k in value if k not in schema]
+            msg = f"'{pn}'に未許可のキーが含まれています: {extra_keys}。"
+            raise KeyError(msg)
+        return validated_dict
+
+
+class VFloat(VNumber[float]):
+    """浮動小数点数専用のバリデータ。"""
+
+    def __init__(
+        self,
+        min_val: float | None = None,
+        max_val: float | None = None,
+    ) -> None:
+        super().__init__(min_val, max_val, type_strict=True)
+
+    @override
+    def _check_type(self, value: Any) -> None:
+        if not isinstance(value, float):
+            msg = f"'{self.public_name}'はfloat型である必要があります。"
+            raise TypeError(msg)
+
+
+class VInt(VNumber[int]):
+    """整数専用のバリデータ。"""
+
+    def __init__(
+        self,
+        min_val: int | None = None,
+        max_val: int | None = None,
+    ) -> None:
+        super().__init__(min_val, max_val, type_strict=True)
+
+    @override
+    def _check_type(self, value: Any) -> None:
+        if not isinstance(value, int) or isinstance(value, bool):
+            msg = f"'{self.public_name}'はint型(boolを除く)である必要があります。"
+            raise TypeError(msg)
+
+
+class VList[OutT](VSequence[list[Any]]):
+    @override
+    def validate(self, value: Any) -> list[OutT]:
+        if not isinstance(value, list):
+            msg = f"'{self.public_name}'はlist型である必要があります。"
+            raise TypeError(msg)
+        return self._validate_items(value)
+
+
+class VNone(Validator[None]):
+    """値がNoneであることを検証するバリデータ。"""
+
+    @override
+    def validate(self, value: Any) -> None:
+        if value is not None:
+            msg = f"'{self.public_name}'はNoneである必要があります（指定された型: {type(value).__name__}）。"
+            raise TypeError(msg)
+        return None
+
+
+class VPath(Validator[Path]):
+    """
+    pathlib.Path オブジェクトの属性を検証するバリデータ。
+    """
+
+    def __init__(
+        self,
+        *extensions: str,
+        must_exist: bool = False,
+        path_type: Literal["dir", "file"] | Callable[[Path], bool] | None = None,
+    ) -> None:
+        super().__init__()
+        self.extensions = tuple(ext if ext.startswith(".") else f".{ext}" for ext in extensions)
+        self.must_exist = must_exist
+
+        # path_typeの解決
+        if path_type == "file":
+            self.check_func = Path.is_file
+        elif path_type == "dir":
+            self.check_func = Path.is_dir
+        else:
+            self.check_func = path_type
+
+    @override
+    def validate(self, value: Any) -> Path:
+        pn = self.public_name
+        if not isinstance(value, Path):
+            msg = f"'{pn}'はpathlib.Path型である必要があります（指定された型: {type(value).__name__}）。"
+            raise TypeError(msg)
+        exists = value.exists()
+
+        # 1. 存在チェック
+        if self.must_exist and not exists:
+            msg = f"'{pn}'のパスが存在しません: {value}。"
+            raise FileNotFoundError(msg)
+        # 2. 種類チェック
+        cf = self.check_func
+        if cf and exists:
+            if not cf(value):
+                func_name = getattr(cf, "__name__", "custom check")
+                msg = f"'{pn}'はパス種別検証に失敗しました: {func_name}({value})。"
+                raise ValueError(msg)
+
+        # 3. 拡張子チェック
+        exts = self.extensions
+        if exts and value.suffix not in exts:
+            match len(exts):
+                case 0:
+                    msg = f"'{pn}'に拡張子が指定されていません。"
+                    raise ValueError(msg)
+                case 1:
+                    txt_exts = exts[0]
+                case _:
+                    txt_exts = "[" + ", ".join(exts) + "]"
+            msg = f"'{pn}'の拡張子は{txt_exts}のいずれかである必要があります（指定された拡張子: {value.suffix!r}）。"
+            raise ValueError(msg)
+        return value
+
+
+class VRange[OutT: Comparable](Validator[OutT]):
+    """比較可能なオブジェクトの範囲を検証するバリデータ。"""
+
+    def __init__(
+        self,
+        min_val: OutT | None = None,
+        max_val: OutT | None = None,
+    ) -> None:
+        super().__init__()
+        self.min_val = min_val
+        self.max_val = max_val
+
+    @override
+    def validate(self, value: Any) -> OutT:
+        # value が比較可能であることを前提とする
+        # 厳密な型チェックが必要な場合は VType と組み合わせて使用する
+        pn = self.public_name
+        try:
+            if (mv := self.min_val) is not None and value < mv:
+                msg = f"'{pn}'は{mv}以上である必要があります。"
+                raise ValueError(msg)
+            if (mv := self.max_val) is not None and value > mv:
+                msg = f"'{pn}'は{mv}以下である必要があります。"
+                raise ValueError(msg)
+        except TypeError:
+            msg = f"'{pn}'（型: {type(value).__name__}）は比較可能ではありません。"
+            raise TypeError(msg) from None
+        return value
+
+
+class VString(Validator[str]):
+    """文字列の長さを検証するバリデータ。"""
+
+    def __init__(
+        self,
+        min_len: int | None = None,
+        max_len: int | None = None,
+        pattern: str | re.Pattern[str] | None = None,
+        *,
+        checker: Callable[[str], bool] | None = None,
+    ) -> None:
+        super().__init__()
+        self.min_len = min_len
+        self.max_len = max_len
+        self.pattern = re.compile(pattern) if isinstance(pattern, str) else pattern
         self.checker = checker
 
+    @override
     def validate(self, value: Any) -> str:
-        E = self.ERRMSG
-        if type(value) is not str:
-            msg = E("str型である必要があります", value)
+        pn = self.public_name
+        # 1. 型チェック
+        if not isinstance(value, str):
+            msg = f"'{pn}'はstr型である必要があります。"
             raise TypeError(msg)
-        lv = len(value)
-        if (mini := self.minimum) is not None and lv < mini:
-            msg = E(f"{mini}文字以上である必要があります", value)
+        # 2. 長さチェック
+        length = len(value)
+        if (ml := self.min_len) is not None and length < ml:
+            msg = f"'{pn}'の長さは{ml}以上である必要があります。"
             raise ValueError(msg)
-        if (maxi := self.maximum) is not None and lv > maxi:
-            msg = E(f"{maxi}文字以下である必要があります", value)
+        if (ml := self.max_len) is not None and length > ml:
+            msg = f"'{pn}'の長さは{ml}以下である必要があります。"
             raise ValueError(msg)
-        if (checker := self.checker) is not None and not checker(value):
-            msg = E(f"指定した形式に対応している必要があります。{repr(checker)}", value)
+        # 3. 正規表現チェック
+        if (pattern := self.pattern) and not pattern.search(value):
+            msg = f"'{pn}'はパターン'{pattern.pattern}'にマッチしません。"
+            raise ValueError(msg)
+        # 4. カスタムチェッカー
+        if (checker := self.checker) and not checker(value):
+            msg = f"'{pn}'はカスタム検証に失敗しました。"
             raise ValueError(msg)
         return value
 
 
 class VRegex(VString):
-    """VStringの拡張バリデータです。
-
-    VStringの条件に加え、正規表現によるチェックをしたい場合に使用できます。
+    """
+    [非推奨]VRegexは非推奨です。将来のバージョンで削除されます。
+    代わりにVString(pattern=...)を使用してください。
     """
 
-    pattern = VString()
-
-    def __init__(self, pattern: str, minimum: Optional[int] = None, maximum: Optional[int] = None, checker: Optional[Callable[[str], bool]] = None) -> None:
-        """正規表現、最低文字数、最大文字数、確認関数を設定してバリデータを生成します。
-
-        Args:
-            pattern (str): 正規表現です。
-            minimum (Optional[int], optional): 最低文字数です。
-            maximum (Optional[int], optional): 最大文字数です。
-            checker (Optional[Callable[[str],bool]], optional): 指定した形式であるかを返す関数です。
-        """
-        super().__init__(minimum=minimum, maximum=maximum, checker=checker)
-        self.pattern = pattern
-
-    def validate(self, value: Any) -> str:
-        value = super().validate(value)
-        if not re.match(self.pattern, value):
-            msg = self.ERRMSG(f"正規表現{repr(self.pattern)}に対応している必要があります", value)
-            raise ValueError(msg)
-        return value
+    def __init__(
+        self,
+        pattern: str,
+        min_len: int | None = None,
+        max_len: int | None = None,
+        checker: Callable[[str], bool] | None = None,
+    ) -> None:
+        msg = "VRegexは非推奨です。代わりにVString(pattern=...)を使用してください。"
+        warnings.warn(msg, DeprecationWarning, stacklevel=2)
+        super().__init__(min_len, max_len, pattern, checker=checker)
 
 
-class VTimedelta(Validator):
-    """適切な経過時間かどうかを確認するバリデータです。"""
+class VTimedelta(Validator[timedelta]):
+    """timedelta オブジェクトであることを検証するバリデータ。"""
 
-    def __get__(self, instance, otype) -> timedelta:
-        return super().__get__(instance, otype)
-
+    @override
     def validate(self, value: Any) -> timedelta:
-        if type(value) is not timedelta:
-            msg = self.ERRMSG("timedelta型である必要があります", value)
+        if not isinstance(value, timedelta):
+            msg = f"'{self.public_name}'はtimedelta型である必要があります（指定された型: {type(value).__name__}）。"
             raise TypeError(msg)
         return value
 
 
-class VDict(VContainer):
-    """適切な辞書かどうかを確認するバリデータです。"""
-
-    def __get__(self, instance, otype) -> dict:
-        return super().__get__(instance, otype)
-
-    def __init__(self, TEMPLATE: dict, allow_missing_key: bool, monitoring_overwrite: bool = True, allow_convert: bool = True) -> None:
-        """雛形、キーの欠落を許可するか、アクセス時に再検証を行うか、変換を許可するかを設定してバリデータを生成します。
-
-        Args:
-            TEMPLATE (dict): 雛形です。
-            allow_missing_key (bool): キーの欠落を許可するかどうかです。
-            monitoring_overwrite (bool, optional): アクセス時に再検証を行うかどうかです。要素数などによっては時間がかかる場合があります。不変であることが保証されている場合などには無効にしてください。
-            allow_convert (bool, optional): コンバータによる要素の変換を許可するかどうかです。
-        """
-        super().__init__(TEMPLATE, monitoring_overwrite=monitoring_overwrite, allow_convert=allow_convert)
-        self.allow_missing_key = allow_missing_key
-
-    def validate(self, value) -> dict:
-        E = self.ERRMSG
-        if not isinstance(value, dict):
-            msg = E("dict型である必要があります", value)
+class VTuple[OutT](VSequence[tuple[OutT, ...]]):
+    @override
+    def validate(self, value: Any) -> tuple[OutT, ...]:
+        if not isinstance(value, tuple):
+            msg = f"'{self.public_name}'はtuple型である必要があります。"
             raise TypeError(msg)
-        self.TEMPLATE = cast(dict, self.TEMPLATE)
-        KEYS = set(self.TEMPLATE.keys())
-        VKEYS = set(value.keys())
-        if KEYS ^ VKEYS:
-            if unnecessary_keys := VKEYS - KEYS:
-                msg = E(f"以下のキーを設定することはできません。({unnecessary_keys})", value)
-                raise ValueError(msg)
-            if not self.allow_missing_key and (missing_key := KEYS - VKEYS):
-                msg = E(f"以下のキーを設定する必要があります。({missing_key})", value)
-                raise ValueError(msg)
-        for k, v in value.items():
-            tv = self.TEMPLATE.get(k)
-            if isinstance(tv, Validator):
-                try:
-                    if isinstance(tv, Converter):
-                        if self.allow_convert:
-                            value[k] = tv.validate(v)
-                        else:
-                            tv.super_validate(v)
-                    else:
-                        tv.validate(v)
-                except Exception as e:
-                    etype = type(e)
-                    msg = E(f"キー{repr(k)}は不正な値です", v, False)
-                    raise etype(msg)
-        return value
+        return tuple(self._validate_items(value))
 
 
-class VList(VContainer):
-    """適切なリストか確認するバリデータです。"""
+class VType[OutT](Validator[OutT]):
+    """指定された型であることを検証するバリデータ。"""
 
-    def __get__(self, instance, otype) -> list:
-        return super().__get__(instance, otype)
+    def __init__(self, target_type: type[OutT], strict: bool = True) -> None:
+        super().__init__()
+        self.target_type = target_type
+        self.strict = strict
 
-    def __init__(
-        self,
-        TEMPLATE: Union[list, Validator, Any],
-        minimum: Optional[int] = None,
-        maximum: Optional[int] = None,
-        monitoring_overwrite: bool = True,
-        allow_convert: bool = True,
-    ) -> None:
-        """雛形、最小、最大要素数、アクセス時に再検証を行うか、変換を許可するかを設定し、バリデータを作成します。
-
-        TEMPLATEがAnyの場合、クラスか、インスタンスかでbool以外の型チェックの挙動が変化します。
-        クラスの場合にはtype(TEMPLATE) is type(v)、インスタンスの場合にはisinstance(v, type(TEMPLATE))で判定が行われます。
-        これはTEMPLATEがlistでValidator以外を含めた時にも適応されます。
-
-        Args:
-            TEMPLATE (Union[list, Validator, Any]): 雛形です。渡す型によって挙動が変化します。
-            minimum (Optional[int], optional): 最小要素数です。TEMPLATEがリストの場合には機能しません。
-            maximum (Optional[int], optional): 最大要素数です。TEMPLATEがリストの場合には機能しません。
-            monitoring_overwrite (bool, optional): アクセス時に再検証を行うかどうかです。要素数などによっては時間がかかる場合があります。不変であることが保証されている場合などには無効にしてください。
-            allow_convert (bool, optional): コンバータによる要素の変換を許可するかどうかです。
-        """
-        super().__init__(TEMPLATE, monitoring_overwrite=monitoring_overwrite, allow_convert=allow_convert)
-        self.minimum = minimum
-        self.maximum = maximum
-
-    def validate(self, value: Any) -> list:
-        E = self.ERRMSG
-        if type(value) is not list:
-            msg = E("list型である必要があります", value)
-            raise TypeError(msg)
-        if type(self.TEMPLATE) is list:
-            return self._validate_of_structure(value)
-        lv = len(value)
-        if (mini := self.minimum) is not None and lv < mini:
-            msg = E(f"あと{mini-lv}個設定する必要があります", value)
-            raise ValueError(msg)
-        if (maxi := self.maximum) is not None and lv > maxi:
-            msg = E(f"あと{lv-maxi}個減らす必要があります", value)
-            raise ValueError(msg)
-        if isinstance(self.TEMPLATE, Validator):
-            return self._validate_by_validator(value)
+    @override
+    def validate(self, value: Any) -> OutT:
+        t_type = self.target_type
+        if self.strict:
+            is_valid = type(value) is t_type
+            type_name = t_type.__name__
         else:
-            return self._validate_by_type(value)
-
-    def _validate_by_type(self, value) -> list:
-        E = self.ERRMSG
-        vtype = self.TEMPLATE if (is_type := inspect.isclass(self.TEMPLATE)) else type(self.TEMPLATE)
-        for i, v in enumerate(value):
-            msg = E(f"インデックス{i}は{vtype.__name__}型である必要があります", v, False)
-            if type(v) is bool:
-                if vtype is not bool:
-                    raise TypeError(msg)
-            elif is_type:
-                if type(v) is not vtype:
-                    raise TypeError(msg)
-            else:
-                if not isinstance(v, vtype):
-                    msg = E(f"インデックス{i}は{vtype.__name__}型あるいはそのサブクラスである必要があります", v, False)
-                    raise TypeError(msg)
-        return value
-
-    def _validate_by_validator(self, value) -> list:
-        T = cast(Union[Validator, Converter], self.TEMPLATE)
-        for i, v in enumerate(value):
-            try:
-                if isinstance(T, Converter):
-                    if self.allow_convert:
-                        value[i] = T.validate(v)
-                    else:
-                        T.super_validate(v)
-                else:
-                    T.validate(v)
-            except Exception as e:
-                etype = type(e)
-                msg = self.ERRMSG(f"インデックス{i}は不正な値です", v, False)
-                raise etype(msg)
-        return value
-
-    def _validate_of_structure(self, value) -> list:
-        E = self.ERRMSG
-        if (diff_len := len(value) - len(self.TEMPLATE)) > 0:
-            msg = E(f"あと{diff_len}個減らす必要があります", value)
-            raise ValueError(msg)
-        if diff_len < 0:
-            msg = E(f"あと{diff_len*-1}個設定する必要があります", value)
-            raise ValueError(msg)
-        for i, (v, validator) in enumerate(zip(value, self.TEMPLATE)):
-            if isinstance(validator, Validator):
-                try:
-                    if isinstance(validator, Converter):
-                        if self.allow_convert:
-                            value[i] = validator.validate(v)
-                        else:
-                            validator.super_validate(v)
-                    else:
-                        validator.validate(v)
-                except Exception as e:
-                    etype = type(e)
-                    msg = E(f"インデックス{i}は不正な値です", v, False)
-                    raise etype(msg)
-            else:
-                vtype = validator if (is_type := inspect.isclass(validator)) else type(validator)
-                msg = E(f"インデックス{i}は{vtype.__name__}型である必要があります", v, False)
-                if type(v) is bool:
-                    if vtype is not bool:
-                        raise TypeError(msg)
-                elif is_type:
-                    if type(v) is not vtype:
-                        raise TypeError(msg)
-                else:
-                    if not isinstance(v, vtype):
-                        msg = E(f"インデックス{i}は{vtype.__name__}型あるいはそのサブクラスである必要があります", v, False)
-                        raise TypeError(msg)
-        return value
-
-
-class VTuple(VContainer):
-    """適切なタプルか確認するバリデータです。"""
-
-    def __get__(self, instance, otype) -> tuple:
-        return super().__get__(instance, otype)
-
-    def __init__(
-        self,
-        TEMPLATE: Union[tuple, Validator, Any],
-        minimum: Optional[int] = None,
-        maximum: Optional[int] = None,
-        monitoring_overwrite: bool = True,
-        allow_convert: bool = True,
-    ) -> None:
-        """雛形、最小、最大要素数、アクセス時に再検証を行うか、変換を許可するかを設定し、バリデータを作成します。
-
-        TEMPLATEがAnyの場合、クラスオブジェクトか、インスタンスかでbool以外の型チェックの挙動が変化します。
-        具体的にはクラスの場合にはtype(TEMPLATE) is type(v)、インスタンスの場合にはisinstance(v, type(TEMPLATE))で判定が行われます。
-        これはTEMPLATEがtupleでValidator以外を含めた時にも適応されます。
-
-
-        Args:
-            TEMPLATE (Union[tuple, Validator, Any]): 雛形です。渡す型によって挙動が変化します。
-            minimum (Optional[int], optional): 最小要素数です。TEMPLATEがタプルの場合には機能しません。
-            maximum (Optional[int], optional): 最大要素数です。TEMPLATEがタプルの場合には機能しません。
-            monitoring_overwrite (bool, optional): アクセス時に再検証を行うかどうかです。要素数などによっては時間がかかる場合があります。不変であることが保証されている場合などには無効にしてください。
-            allow_convert (bool, optional): コンバータによる要素の変換を許可するかどうかです。
-        """
-        super().__init__(TEMPLATE, monitoring_overwrite=monitoring_overwrite, allow_convert=allow_convert)
-        self.minimum = minimum
-        self.maximum = maximum
-
-    def validate(self, value: Any) -> tuple:
-        E = self.ERRMSG
-        if type(value) is not tuple:
-            msg = E("tuple型である必要があります", value)
+            is_valid = isinstance(value, t_type)
+            type_name = f"{t_type.__name__}のサブクラス"
+        if not is_valid:
+            msg = f"'{self.public_name}'は{type_name}である必要があります（指定された型: {type(value).__name__}）。"
             raise TypeError(msg)
-        if type(self.TEMPLATE) is tuple:
-            return self._validate_of_structure(value)
-        lv = len(value)
-        if (mini := self.minimum) is not None and lv < mini:
-            msg = E(f"あと{mini-lv}個設定する必要があります", value)
-            raise ValueError(msg)
-        if (maxi := self.maximum) is not None and lv > maxi:
-            msg = E(f"あと{lv-maxi}個減らす必要があります", value)
-            raise ValueError(msg)
-        if isinstance(self.TEMPLATE, Validator):
-            return self._validate_by_validator(value)
-        else:
-            return self._validate_by_type(value)
-
-    def _validate_by_type(self, value) -> tuple:
-        E = self.ERRMSG
-        vtype = self.TEMPLATE if (is_type := inspect.isclass(self.TEMPLATE)) else type(self.TEMPLATE)
-        for i, v in enumerate(value):
-            msg = E(f"インデックス{i}は{vtype.__name__}型である必要があります", v, False)
-            if type(v) is bool:
-                if vtype is not bool:
-                    raise TypeError(msg)
-            elif is_type:
-                if type(v) is not vtype:
-                    raise TypeError(msg)
-            else:
-                if not isinstance(v, vtype):
-                    msg = E(f"インデックス{i}は{vtype.__name__}型あるいはそのサブクラスである必要があります", v, False)
-                    raise TypeError(msg)
         return value
 
-    def _validate_by_validator(self, value) -> tuple:
-        if self.allow_convert:
-            return self._validate_by_validator_allow(value)
-        if isinstance(self.TEMPLATE, Converter):
-            validate = self.TEMPLATE.super_validate
-        else:
-            validate = self.TEMPLATE.validate
-        for i, v in enumerate(value):
-            try:
-                validate(v)
-            except Exception as e:
-                etype = type(e)
-                msg = self.ERRMSG(f"インデックス{i}は不正な値です", v, False)
-                raise etype(msg)
-        return value
 
-    def _validate_by_validator_allow(self, value) -> tuple:
-        self.TEMPLATE = cast(Union[Validator, Converter], self.TEMPLATE)
-        res = []
-        for i, v in enumerate(value):
-            try:
-                res.append(self.TEMPLATE.validate(v))
-            except Exception as e:
-                etype = type(e)
-                msg = self.ERRMSG(f"インデックス{i}は不正な値です", v, False)
-                raise etype(msg)
-        return tuple(res)
+def _ensure_validator(arg: Any) -> Validator[Any]:
+    """
+    入力を適切なバリデータに変換する。
+    1. Validator インスタンスならそのまま返す。
+    2. 型 (type) なら VType(strict=True) に変換。
+    3. インスタンス (str, int 等) なら対応するバリデータ、
+       または VType(type(arg), strict=False) にフォールバック。
+    """
+    if isinstance(arg, Validator):
+        return arg
+    # 1. 型が直接渡された場合: type(value) is Tの厳密判定
+    if isinstance(arg, type):
+        return VType(arg, strict=True)
 
-    def _validate_of_structure(self, value) -> tuple:
-        E = self.ERRMSG
-        TMP = cast(tuple, self.TEMPLATE)
-        if (diff_len := len(value) - len(TMP)) > 0:
-            msg = E(f"あと{diff_len}個減らす必要があります", value)
-            raise ValueError(msg)
-        if diff_len < 0:
-            msg = E(f"あと{diff_len*-1}個設定する必要があります", value)
-            raise ValueError(msg)
-        if self.allow_convert:
-            return self._validate_of_structure_allow(value)
-        for i, (v, validator) in enumerate(zip(value, TMP)):
-            if isinstance(validator, Validator):
-                try:
-                    if isinstance(validator, Converter):
-                        validator.super_validate(v)
-                    else:
-                        validator.validate(v)
-                except Exception as e:
-                    etype = type(e)
-                    msg = E(f"インデックス{i}は不正な値です", v, False)
-                    raise etype(msg)
-            else:
-                vtype = validator if (is_type := inspect.isclass(validator)) else type(validator)
-                msg = E(f"インデックス{i}は{vtype.__name__}型である必要があります", v, False)
-                if type(v) is bool:
-                    if vtype is not bool:
-                        raise TypeError(msg)
-                elif is_type:
-                    if type(v) is not vtype:
-                        raise TypeError(msg)
-                else:
-                    if not isinstance(v, vtype):
-                        msg = E(f"インデックス{i}は{vtype.__name__}型あるいはそのサブクラスである必要があります", v, False)
-                        raise TypeError(msg)
-        return value
+    # 2. 値(インスタンス)が渡された場合: isinstance(value, T)の継承許容判定
+    if isinstance(arg, bool):
+        return VBool()
+    if isinstance(arg, int):
+        return VInt()
+    if isinstance(arg, float):
+        return VFloat()
+    if isinstance(arg, str):
+        return VString()
+    if isinstance(arg, Path):
+        return VPath()
+    if isinstance(arg, timedelta):
+        return VTimedelta()
 
-    def _validate_of_structure_allow(self, value) -> tuple:
-        E = self.ERRMSG
-        res = []
-        TMP = cast(tuple, self.TEMPLATE)
-        for i, (v, validator) in enumerate(zip(value, TMP)):
-            if isinstance(validator, Validator):
-                try:
-                    if isinstance(validator, Converter):
-                        v = validator.validate(v)
-                    else:
-                        validator.validate(v)
-                except Exception as e:
-                    etype = type(e)
-                    msg = E(f"インデックス{i}は不正な値です", v, False)
-                    raise etype(msg)
-            else:
-                vtype = validator if (is_type := inspect.isclass(validator)) else type(validator)
-                msg = E(f"インデックス{i}は{vtype.__name__}型である必要があります", v, False)
-                if type(v) is bool:
-                    if vtype is not bool:
-                        raise TypeError(msg)
-                elif is_type:
-                    if type(v) is not vtype:
-                        raise TypeError(msg)
-                else:
-                    if not isinstance(v, vtype):
-                        msg = E(f"インデックス{i}は{vtype.__name__}型あるいはそのサブクラスである必要があります", v, False)
-                        raise TypeError(msg)
-            res.append(v)
-        return tuple(res)
+    if isinstance(arg, list):
+        return VList(arg)
+    if isinstance(arg, tuple):
+        return VTuple(arg)
+    if isinstance(arg, dict):
+        return VDict(arg)
+
+    # 未対応の型/インスタンスに対するフォールバック
+    # インスタンスが渡されたので、その型に対して strict=False で登録
+    return VType(type(arg), strict=False)

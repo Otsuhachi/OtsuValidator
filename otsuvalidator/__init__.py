@@ -1,84 +1,31 @@
-"""単体でもディスクリプタとしても使用できるバリデータライブラリです。
-
-    以下で紹介されているクラスは対応するモジュールからインポートしてください。
-
-    base:
-        CNoneable
-        CNumerical
-        Converter
-        Validator
-        VContainer
-"""
-
-
-__all__ = (
-    "CBool",
-    "CFloat",
-    "CInt",
-    "CNoneable",
-    "CNumber",
-    "CPath",
-    "CString",
-    "CTimedelta",
-    "VBool",
-    "VChoice",
-    "VDict",
-    "VFloat",
-    "VInt",
-    "VList",
-    "VNumber",
-    "VPath",
-    "VRegex",
-    "VString",
-    "VTimedelta",
-    "VTuple",
-)
-
-
-from .bases import CNoneable
+__version__ = "1.1.0.312"
+from .bases import VChain
 from .converters import (
     CBool,
     CFloat,
     CInt,
     CNumber,
+    CNumerical,
     CPath,
     CString,
     CTimedelta,
 )
 from .validators import (
+    VAny,
     VBool,
     VChoice,
     VDict,
     VFloat,
     VInt,
     VList,
+    VNone,
     VNumber,
     VPath,
+    VRange,
     VRegex,
+    VSequence,
     VString,
     VTimedelta,
     VTuple,
-)
-
-__all__ = (
-    "CNoneable",
-    "CBool",
-    "CFloat",
-    "CInt",
-    "CNumber",
-    "CPath",
-    "CString",
-    "CTimedelta",
-    "VBool",
-    "VChoice",
-    "VDict",
-    "VFloat",
-    "VInt",
-    "VList",
-    "VNumber",
-    "VPath",
-    "VRegex",
-    "VString",
-    "VTimedelta",
-    "VTuple",
+    VType,
 )
