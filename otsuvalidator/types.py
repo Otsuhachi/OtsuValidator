@@ -1,20 +1,13 @@
-__all__ = (
-    "FLOAT_INT",
-    "Comparable",
-    "StrPath",
-)
+__all__ = ("Comparable",)
 
 
-import pathlib
-from typing import Any, Protocol
-
-type StrPath = str | pathlib.Path
-type FLOAT_INT = float | int
+from typing import Protocol
 
 
 # 比較演算子を持つことを示すためのProtocol
 class Comparable(Protocol):
     # <
-    def __lt__(self, other: Any) -> bool: ...
+    def __lt__(self, other: object) -> bool: ...
+
     # ==
-    def __eq__(self, other: Any) -> bool: ...
+    def __eq__(self, other: object) -> bool: ...

@@ -1,8 +1,8 @@
 __all__ = (
     "Converter",
-    "Validator",
     "VChain",
     "VContainer",
+    "Validator",
 )
 
 
@@ -49,7 +49,7 @@ class Validator[OutT](ABC):
         [抽象メソッド] 子クラスで必ず実装する必要がある。
         値が正しければその値を返し、不正なら例外を投げる。
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def __set__(self, instance: Any, value: Any) -> None:
         """値を代入する際に呼び出される。
@@ -72,7 +72,7 @@ class Converter[InT, OutT](Validator[OutT]):
     @abstractmethod
     def validate(self, value: InT) -> OutT:
         """入力値を変換して返すロジックを実装する。"""
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def super_validate(self, value: Any) -> OutT:
         """変換を行わず、スーパークラスの検証のみを行う。"""

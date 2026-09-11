@@ -1,4 +1,6 @@
-__version__ = "1.1.1.312"
+__VERSION__ = "1.1.2.312"
+
+
 __all__ = (
     "CBool",
     "CFloat",

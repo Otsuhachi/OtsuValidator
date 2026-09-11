@@ -18,7 +18,6 @@ from pathlib import Path
 from typing import Any, Literal, override
 
 from .bases import Converter
-from .types import FLOAT_INT, StrPath
 from .validators import VBool, VNumerical, VPath, VString, VTimedelta
 
 
@@ -111,7 +110,7 @@ class CBool(VBool, Converter[Any, bool]):
         return super().validate(tmp_value)
 
 
-class CNumerical[OutT: FLOAT_INT](VNumerical[OutT], Converter[Any, OutT]):
+class CNumerical[OutT: float | int](VNumerical[OutT], Converter[Any, OutT]):
     """
     数値を変換し、範囲を検証するコンバータの基底クラス。
     """
@@ -138,16 +137,14 @@ class CNumerical[OutT: FLOAT_INT](VNumerical[OutT], Converter[Any, OutT]):
             if t_type is None:
                 # 動的判定モード
                 f_val = float(value)
-                if f_val.is_integer():
-                    converted = int(f_val)
-                else:
-                    converted = f_val
+                converted = int(f_val) if f_val.is_integer() else f_val
             else:
                 converted = tmp_value = float(value)
                 if t_type is not float:
                     converted = t_type(tmp_value)
                 if converted != tmp_value:
-                    raise ValueError(f"変換後の数値が元の数値と等価ではありません。{value} != {converted}")
+                    msg = f"変換後の数値が元の数値と等価ではありません。{value} != {converted}"
+                    raise ValueError(msg)
         except (TypeError, ValueError):
             type_name = t_type.__name__ if t_type else "number"
             msg = f"'{self.public_name}'を{type_name}に変換できませんでした: {value!r}。"
@@ -155,7 +152,7 @@ class CNumerical[OutT: FLOAT_INT](VNumerical[OutT], Converter[Any, OutT]):
         return super().validate(converted)
 
 
-class CNumber[OutT: FLOAT_INT](CNumerical[OutT]):
+class CNumber[OutT: float | int](CNumerical[OutT]):
     """
     [非推奨]CNumberは非推奨です。将来のバージョンで削除されます。
     代わりにCNumericalを使用してください。
@@ -200,14 +197,14 @@ class CFloat(CNumerical[float]):
         super().__init__(target_type=float, min_val=min_val, max_val=max_val)
 
 
-class CPath(VPath, Converter[StrPath, Path]):
+class CPath(VPath, Converter[str | Path, Path]):
     """文字列をPathオブジェクトに変換し、属性を検証するコンバータ。"""
 
     def __init__(
         self,
         *extensions: str,
         must_exist: bool = False,
-        path_type: Callable[[Path], bool] | None | Literal["dir", "file"] = None,
+        path_type: Callable[[Path], bool] | Literal["dir", "file"] | None = None,
     ) -> None:
         super().__init__(*extensions, must_exist=must_exist, path_type=path_type)
 

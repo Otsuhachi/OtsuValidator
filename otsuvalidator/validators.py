@@ -28,10 +28,10 @@ from pathlib import Path
 from typing import Any, Literal, override
 
 from .bases import Validator, VContainer
-from .types import FLOAT_INT, Comparable
+from .types import Comparable
 
 
-class VNumerical[OutT: FLOAT_INT](Validator[OutT]):
+class VNumerical[OutT: float | int](Validator[OutT]):
     """数値の範囲を検証するバリデータ。"""
 
     def __init__(
@@ -49,7 +49,8 @@ class VNumerical[OutT: FLOAT_INT](Validator[OutT]):
     def _check_type(self, value: Any) -> None:
         """標準的な数値チェック（サブクラスでオーバーライドされることを想定）。"""
         if not isinstance(value, (int, float)) or isinstance(value, bool):
-            raise TypeError(f"'{self.public_name}'は数値(boolを除く)である必要があります。")
+            msg = f"'{self.public_name}'は数値(boolを除く)である必要があります。"
+            raise TypeError(msg)
 
     @override
     def validate(self, value: Any) -> OutT:
@@ -64,7 +65,7 @@ class VNumerical[OutT: FLOAT_INT](Validator[OutT]):
         return value
 
 
-class VNumber[OutT: FLOAT_INT](VNumerical[OutT]):
+class VNumber[OutT: float | int](VNumerical[OutT]):
     """
     [非推奨]VNumberは非推奨です。将来のバージョンで削除されます。
     代わりにVNumericalを使用してください。
@@ -95,13 +96,12 @@ class VSequence[OutT](VContainer[OutT]):
     ) -> None:
         # スキーマがリストやタプル(集合)か、単一の定義かを判定
         self.is_zip_mode = isinstance(item_schema, (list, tuple))
-        if self.is_zip_mode:
-            # 個別適用モード: zip(value, schema)で検証
-            schema = tuple(_ensure_validator(s) for s in item_schema)
-        else:
-            # 一律適用モード: 全ての要素に同じバリデータを適用
-            schema = _ensure_validator(item_schema)
-        super().__init__(schema=schema, monitoring_overwrite=monitoring_overwrite)
+        schema = tuple(_ensure_validator(s) for s in item_schema) if self.is_zip_mode else _ensure_validator(item_schema)
+        super().__init__(
+            schema=schema,
+            monitoring_overwrite=monitoring_overwrite,
+        )
+
         self.min_len = min_len
         self.max_len = max_len
 
@@ -124,10 +124,9 @@ class VSequence[OutT](VContainer[OutT]):
                 msg = f"'{pn}'の要素数（{length}）が定義されたスキーマの数（{len(validators)}）と一致しません。"
                 raise ValueError(msg)
             return [v.validate(x) for v, x in zip(validators, value, strict=False)]
-        else:
-            # 一律適用
-            validator: Validator[Any] = self.schema
-            return [validator.validate(item) for item in value]
+        # 一律適用
+        validator: Validator[Any] = self.schema
+        return [validator.validate(item) for item in value]
 
 
 class VAny(Validator[Any]):
@@ -210,9 +209,7 @@ class VDict[InT, OutT](VContainer[dict[InT, OutT]]):
 
         # 2. スキーマにない未知のキーハンドリング
         if self.allow_extra:
-            for k, v in value.items():
-                if k not in schema:
-                    validated_dict[k] = v
+            validated_dict.update({k: v for k, v in value.items() if k not in schema})
         elif any(k not in schema for k in value):
             # 許可されていないキーがある場合、見つけたものを通知
             extra_keys = [k for k in value if k not in schema]
@@ -272,7 +269,7 @@ class VNone(Validator[None]):
         if value is not None:
             msg = f"'{self.public_name}'はNoneである必要があります（指定された型: {type(value).__name__}）。"
             raise TypeError(msg)
-        return None
+        return
 
 
 class VPath(Validator[Path]):
@@ -312,11 +309,10 @@ class VPath(Validator[Path]):
             raise FileNotFoundError(msg)
         # 2. 種類チェック
         cf = self.check_func
-        if cf and exists:
-            if not cf(value):
-                func_name = getattr(cf, "__name__", "custom check")
-                msg = f"'{pn}'はパス種別検証に失敗しました: {func_name}({value})。"
-                raise ValueError(msg)
+        if cf and exists and not cf(value):
+            func_name = getattr(cf, "__name__", "custom check")
+            msg = f"'{pn}'はパス種別検証に失敗しました: {func_name}({value})。"
+            raise ValueError(msg)
 
         # 3. 拡張子チェック
         exts = self.extensions
