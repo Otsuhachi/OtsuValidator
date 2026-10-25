@@ -8,4 +8,8 @@ name = "pypi"
 [dev-packages]
 
 [requires]
-python_version = "3.12"
+python_version = "3.13"
+
+[scripts]
+reset = "pwsh -Command Remove-Item .venv -Force -Recurse && py -m pipenv update -d"
+test = "pwsh -Command pipenv run py -m unittest discover -s tests -p \"test_*.py\" -v"

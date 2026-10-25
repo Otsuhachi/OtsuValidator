@@ -1,0 +1,22 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "otsuvalidator"
+dynamic = ["version"]
+description = "単体でもディスクリプタとしても使用できるバリデータライブラリ"
+readme = "README.md"
+requires-python = ">=3.13"
+authors = [{ name = "Otsuhachi", email = "agequodagis.tufuiegoeris@gmail.com" }]
+license = { text = "MIT License" }
+classifiers = [
+    "Programming Language :: Python :: 3.13",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = []
+
+[tool.hatch.version]
+path = "otsuvalidator/__init__.py"

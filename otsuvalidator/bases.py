@@ -1,13 +1,16 @@
-__all__ = (
+import logging
+from abc import ABC, abstractmethod
+from typing import Any, Literal, Self, overload
+
+__all__ = [
     "Converter",
     "VChain",
     "VContainer",
     "Validator",
-)
+]
 
 
-from abc import ABC, abstractmethod
-from typing import Any, Literal, Self, overload
+logger = logging.getLogger(__name__)
 
 
 class Validator[OutT](ABC):
@@ -104,6 +107,7 @@ class VChain[OutT](Validator[OutT]):
                 except Exception as ex:
                     exceptions.append(ex)
             if not passed:
+                logger.error(f"全てのバリデータでの検証に失敗しました: {value}")
                 raise ValueError(*exceptions)
         return current_value
 

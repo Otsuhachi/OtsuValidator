@@ -1,15 +1,4 @@
-__all__ = (
-    "CBool",
-    "CFloat",
-    "CInt",
-    "CNumber",
-    "CNumerical",
-    "CPath",
-    "CString",
-    "CTimedelta",
-)
-
-
+import logging
 import re
 import warnings
 from collections.abc import Callable
@@ -19,6 +8,20 @@ from typing import Any, Literal, override
 
 from .bases import Converter
 from .validators import VBool, VNumerical, VPath, VString, VTimedelta
+
+__all__ = [
+    "CBool",
+    "CFloat",
+    "CInt",
+    "CNumber",
+    "CNumerical",
+    "CPath",
+    "CString",
+    "CTimedelta",
+]
+
+
+logger = logging.getLogger(__name__)
 
 
 class CBool(VBool, Converter[Any, bool]):
@@ -86,27 +89,31 @@ class CBool(VBool, Converter[Any, bool]):
             elif tmp_value in (no := ("false", "no", "n", "0", "0.0")):
                 tmp_value = False  # type: ignore
             else:
-                msg = f"{yes}または{no}のいずれかである必要があります。\n{tmp_value=}"
-                raise ValueError(msg)
+                msg = "クラス定義の検証に失敗しました"
+                logger.error(f"{msg}: {value}\n\tTrue: {yes}\n\tFalse: {no}")
+                raise ValueError(f"{msg}。")
         elif tv is int:
             if tmp_value == 1:
                 tmp_value = True  # type: ignore
             elif tmp_value == 0:
                 tmp_value = False  # type: ignore
             else:
-                msg = f"1または0である必要があります。\n{tmp_value=}"
-                raise ValueError(msg)
+                msg = "1または0である必要があります"
+                logger.error(f"{msg}: {tmp_value}")
+                raise ValueError(f"{msg}。")
         elif tv is float:
             if tmp_value == 1.0:
                 tmp_value = True  # type: ignore
             elif tmp_value == 0.0:
                 tmp_value = False  # type: ignore
             else:
-                msg = f"1.0または0.0である必要があります。\n{tmp_value=}"
-                raise ValueError(msg)
+                msg = "1.0または0.0である必要があります"
+                logger.error(f"{msg}: {tmp_value}")
+                raise ValueError(f"{msg}。")
         else:
-            msg = f"Yes/Noとして解釈できる必要があります。\n{tmp_value=}"
-            raise TypeError(msg)
+            msg = "Yes/Noとして解釈できる必要があります"
+            logger.error(f"{msg}: {tmp_value}")
+            raise TypeError(f"{msg}。")
         return super().validate(tmp_value)
 
 
@@ -143,12 +150,14 @@ class CNumerical[OutT: float | int](VNumerical[OutT], Converter[Any, OutT]):
                 if t_type is not float:
                     converted = t_type(tmp_value)
                 if converted != tmp_value:
-                    msg = f"変換後の数値が元の数値と等価ではありません。{value} != {converted}"
-                    raise ValueError(msg)
+                    msg = "変換後の数値が元の数値と等価ではありません"
+                    logger.error(f"{msg}: {value} -> {tmp_value}")
+                    raise ValueError(f"{msg}。")
         except (TypeError, ValueError):
             type_name = t_type.__name__ if t_type else "number"
-            msg = f"'{self.public_name}'を{type_name}に変換できませんでした: {value!r}。"
-            raise ValueError(msg) from None
+            msg = f"`{self.public_name}`を`{type_name}型`に変換できませんでした"
+            logger.exception(f"{msg}: {value!r}")
+            raise ValueError(f"{msg}。") from None
         return super().validate(converted)
 
 
@@ -214,8 +223,9 @@ class CPath(VPath, Converter[str | Path, Path]):
         try:
             converted = Path(value)
         except (TypeError, ValueError):
-            msg = f"'{self.public_name}'をpathlib.Pathオブジェクトに変換できませんでした: {value!r}。"
-            raise TypeError(msg) from None
+            msg = f"`{self.public_name}`を`pathlib.Path`オブジェクトに変換できませんでした"
+            logger.exception(f"{msg}: {value!r}")
+            raise TypeError(f"{msg}。") from None
         return super().validate(converted)
 
 
@@ -231,8 +241,9 @@ class CString(VString, Converter[Any, str]):
             try:
                 tmp_value = str(tmp_value)
             except Exception:
-                msg = f"'{self.public_name}'はstr型に変換可能な値である必要があります: {tmp_value!r}。"
-                raise TypeError(msg) from None
+                msg = f"`{self.public_name}`は`str型`に変換可能な値である必要があります"
+                logger.exception(f"{msg}: {tmp_value!r}")
+                raise TypeError(f"{msg}。") from None
         return super().validate(tmp_value)
 
 
@@ -257,8 +268,9 @@ class CTimedelta(VTimedelta, Converter[Any, timedelta]):
             if f is not None:
                 tmp_value = f(tmp_value)
         except Exception:
-            msg = f"'{self.public_name}'はtimedelta型に変換可能な値である必要があります: {tmp_value!r}。"
-            raise TypeError(msg) from None
+            msg = f"`{self.public_name}`は`timedelta型`に変換可能な値である必要があります"
+            logger.exception(f"{msg}: {tmp_value!r}")
+            raise TypeError(f"{msg}") from None
         return super().validate(tmp_value)
 
     def __try_convert_container(self, value: list | tuple) -> timedelta:
@@ -279,5 +291,6 @@ class CTimedelta(VTimedelta, Converter[Any, timedelta]):
                 v = int(v)
                 d[k] = v
             return self.__try_convert_dict(d)
-        msg = f"'{value}'をtimedelta型に変換できませんでした。"
-        raise ValueError(msg)
+        msg = "timedelta型に変換できませんでした"
+        logger.error(f"{msg}: `{value!r}`")
+        raise ValueError(f"{msg}。")

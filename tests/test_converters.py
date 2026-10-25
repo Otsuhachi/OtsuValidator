@@ -47,7 +47,7 @@ class TestSettingsConverters(unittest.TestCase):
         reset_sample()
         pd = "./tmp_settings"
         # must_existにより存在確認が行われる
-        with self.assertRaisesRegex(FileNotFoundError, "のパスが存在しません"):
+        with self.assertRaisesRegex(FileNotFoundError, "のパスは存在しません"):
             self.cfg.pd_setting = pd
         # 同名のファイルを生成
         Path(pd).touch()
@@ -81,10 +81,10 @@ class TestSettingsConverters(unittest.TestCase):
 
     def test_profile_name(self) -> None:
         """profile_name属性の検証"""
-        with self.assertRaisesRegex(ValueError, "長さは30以下である必要があります"):
+        with self.assertRaisesRegex(ValueError, "長さは`30以下`である必要があります"):
             # 2535301200456458802993406410752
             self.cfg.profile_name = 2 << 100
-        with self.assertRaisesRegex(ValueError, "長さは1以上である必要があります"):
+        with self.assertRaisesRegex(ValueError, "長さは`1以上`である必要があります"):
             self.cfg.profile_name = ""
         self.cfg.profile_name = 28
         self.assertEqual(self.cfg.profile_name, "28")
@@ -103,21 +103,21 @@ class TestSettingsConverters(unittest.TestCase):
         self.cfg.save_span = {"days": 1}
         self.assertEqual(self.cfg.save_span, delta)
 
-        with self.assertRaisesRegex(TypeError, "timedelta型に変換可能な値である必要があります"):
+        with self.assertRaisesRegex(TypeError, "`timedelta型`に変換可能な値である必要があります"):
             self.cfg.save_span = {"day": 1}
 
         delta = timedelta(1, 2, 3, 4)
         self.cfg.save_span = [1, 2, 3, 4]
         self.assertEqual(self.cfg.save_span, delta)
 
-        with self.assertRaisesRegex(TypeError, "timedelta型に変換可能な値である必要があります"):
+        with self.assertRaisesRegex(TypeError, "`timedelta型`に変換可能な値である必要があります"):
             self.cfg.save_span = [1, 2, 3, 4, 5, 6, 7, 8]
 
     def test_enable_beep(self) -> None:
         """enable_beep属性の検証"""
         self.cfg.enable_beep = "YeS"
         self.assertEqual(self.cfg.enable_beep, True)
-        with self.assertRaisesRegex(ValueError, "いずれかである必要があります"):
+        with self.assertRaisesRegex(ValueError, "クラス定義の検証に失敗しました。"):
             self.cfg.enable_beep = "Ye"
         self.cfg.enable_beep = 1
         self.assertEqual(self.cfg.enable_beep, True)
@@ -130,9 +130,9 @@ class TestSettingsConverters(unittest.TestCase):
 
     def test_beep_frequency(self) -> None:
         """beep_frequency属性の検証"""
-        with self.assertRaisesRegex(ValueError, "37以上である必要があります"):
+        with self.assertRaisesRegex(ValueError, "`37以上`である必要があります"):
             self.cfg.beep_frequency = 36
-        with self.assertRaisesRegex(ValueError, "intに変換できませんでした"):
+        with self.assertRaisesRegex(ValueError, "`int型`に変換できませんでした"):
             self.cfg.beep_frequency = 37.00000000000001
         self.cfg.beep_frequency = 37.000000000000001
         self.assertEqual(self.cfg.beep_frequency, 37)
@@ -140,13 +140,13 @@ class TestSettingsConverters(unittest.TestCase):
         self.assertEqual(self.cfg.beep_frequency, 37)
         self.cfg.beep_frequency = "37"
         self.assertEqual(self.cfg.beep_frequency, 37)
-        with self.assertRaisesRegex(ValueError, "32767以下である必要があります"):
+        with self.assertRaisesRegex(ValueError, "`32767以下`である必要があります"):
             self.cfg.beep_frequency = 32768
 
     def test_beep_duration_seconds(self) -> None:
-        with self.assertRaisesRegex(ValueError, r"0\.0以上である必要があります"):
+        with self.assertRaisesRegex(ValueError, r"`0\.0以上`である必要があります"):
             self.cfg.beep_duration_seconds = -1.0
-        with self.assertRaisesRegex(ValueError, r"5\.0以下である必要があります"):
+        with self.assertRaisesRegex(ValueError, r"`5\.0以下`である必要があります"):
             self.cfg.beep_duration_seconds = 5.1
         self.cfg.beep_duration_seconds = "5.0"
         self.assertEqual(self.cfg.beep_duration_seconds, 5.0)

@@ -1,4 +1,15 @@
-__all__ = (
+import logging
+import re
+import warnings
+from collections.abc import Callable, Container, Hashable, Iterable
+from datetime import timedelta
+from pathlib import Path
+from typing import Any, Literal, override
+
+from .bases import Validator, VContainer
+from .types import Comparable
+
+__all__ = [
     "VAny",
     "VBool",
     "VChoice",
@@ -17,18 +28,10 @@ __all__ = (
     "VTuple",
     "VType",
     "_ensure_validator",
-)
+]
 
 
-import re
-import warnings
-from collections.abc import Callable, Container, Hashable, Iterable
-from datetime import timedelta
-from pathlib import Path
-from typing import Any, Literal, override
-
-from .bases import Validator, VContainer
-from .types import Comparable
+logger = logging.getLogger(__name__)
 
 
 class VNumerical[OutT: float | int](Validator[OutT]):
@@ -49,19 +52,22 @@ class VNumerical[OutT: float | int](Validator[OutT]):
     def _check_type(self, value: Any) -> None:
         """標準的な数値チェック（サブクラスでオーバーライドされることを想定）。"""
         if not isinstance(value, (int, float)) or isinstance(value, bool):
-            msg = f"'{self.public_name}'は数値(boolを除く)である必要があります。"
-            raise TypeError(msg)
+            msg = f"`{self.public_name}`は数値(boolを除く)である必要があります"
+            logger.error(f"{msg}: {type(value)}")
+            raise TypeError(f"{msg}。")
 
     @override
     def validate(self, value: Any) -> OutT:
         self._check_type(value)
         pn = self.public_name
         if (mv := self.min_val) is not None and value < mv:
-            msg = f"'{pn}'は{mv}以上である必要があります。"
-            raise ValueError(msg)
+            msg = f"`{pn}`は`{mv}以上`である必要があります"
+            logger.error(f"{msg}: {value!r}")
+            raise ValueError(f"{msg}。")
         if (mv := self.max_val) is not None and value > mv:
-            msg = f"'{pn}'は{mv}以下である必要があります。"
-            raise ValueError(msg)
+            msg = f"`{pn}`は`{mv}以下`である必要があります"
+            logger.error(f"{msg}: {value!r}")
+            raise ValueError(f"{msg}。")
         return value
 
 
@@ -78,7 +84,7 @@ class VNumber[OutT: float | int](VNumerical[OutT]):
         *,
         type_strict: bool = False,
     ) -> None:
-        msg = "VNumberは非推奨です。代わりにVNumericalを使用してください。"
+        msg = "`VNumber`は非推奨です。代わりに`VNumerical`を使用してください。"
         warnings.warn(msg, DeprecationWarning, stacklevel=2)
         super().__init__(min_val, max_val, type_strict=type_strict)
 
@@ -112,17 +118,20 @@ class VSequence[OutT](VContainer[OutT]):
         length = len(value)
         pn = self.public_name
         if (ml := self.min_len) is not None and length < ml:
-            msg = f"'{pn}'の要素数は{ml}以上である必要があります。"
-            raise ValueError(msg)
+            msg = f"`{pn}`の要素数は`{ml}以上`である必要があります"
+            logger.error(f"{msg}: {value!r}")
+            raise ValueError(f"{msg}。")
         if (ml := self.max_len) is not None and length > ml:
-            msg = f"'{pn}'の要素数は{ml}以下である必要があります。"
-            raise ValueError(msg)
+            msg = f"`{pn}`の要素数は`{ml}以下`である必要があります"
+            logger.error(f"{msg}: {value!r}")
+            raise ValueError(f"{msg}。")
         if self.is_zip_mode:
             # 個別適用
             validators: tuple[Validator[Any], ...] = self.schema
             if len(validators) != length:
-                msg = f"'{pn}'の要素数（{length}）が定義されたスキーマの数（{len(validators)}）と一致しません。"
-                raise ValueError(msg)
+                msg = f"`{pn}`の要素数（{length}）が定義されたスキーマの数（{len(validators)}）と一致しません"
+                logger.error(f"{msg}: {validators}")
+                raise ValueError(f"{msg}。")
             return [v.validate(x) for v, x in zip(validators, value, strict=False)]
         # 一律適用
         validator: Validator[Any] = self.schema
@@ -143,8 +152,9 @@ class VBool(Validator[bool]):
     @override
     def validate(self, value: Any) -> bool:
         if (tv := type(value)) is not bool:
-            msg = f"'{self.public_name}'はboolean型である必要があります（指定された型: {tv.__name__}）。"
-            raise TypeError(msg)
+            msg = f"`{self.public_name}`は`bool型`である必要があります"
+            logger.error(f"{msg}: {tv}")
+            raise TypeError(f"{msg}。")
         return value
 
 
@@ -162,8 +172,9 @@ class VChoice[OutT](Validator[OutT]):
     def validate(self, value: Any) -> OutT:
         choices = self.choices
         if value not in choices:
-            msg = f"'{self.public_name}'は{choices}のいずれかである必要があります。"
-            raise ValueError(msg)
+            msg = f"`{self.public_name}`が許容された値と一致しません"
+            logger.error(f"{msg}: {value!r}\n\t許容された値: {choices}")
+            raise ValueError(f"{msg}。")
         return value
 
 
@@ -193,8 +204,9 @@ class VDict[InT, OutT](VContainer[dict[InT, OutT]]):
     def validate(self, value: Any) -> dict[InT, OutT]:
         pn = self.public_name
         if not isinstance(value, dict):
-            msg = f"'{pn}'はdict型である必要があります（指定された型: {type(value).__name__}）。"
-            raise TypeError(msg)
+            msg = f"`{pn}`は`dict型`である必要があります"
+            logger.error(f"{msg}: {type(value)}")
+            raise TypeError(f"{msg}。")
         validated_dict: dict[InT, OutT] = {}
         schema: dict[InT, Validator[OutT]] = self.schema
 
@@ -204,8 +216,9 @@ class VDict[InT, OutT](VContainer[dict[InT, OutT]]):
                 v.set_name(f"{pn}[{k!r}]")
                 validated_dict[k] = v.validate(value[k])
             elif not self.allow_missing:
-                msg = f"'{pn}'に必須キー{k!r}が存在しません。"
-                raise KeyError(msg)
+                msg = f"`{pn}`に必須キーが存在しません"
+                logger.error(f"{msg}: {k!r}")
+                raise KeyError(f"{msg}。")
 
         # 2. スキーマにない未知のキーハンドリング
         if self.allow_extra:
@@ -213,8 +226,9 @@ class VDict[InT, OutT](VContainer[dict[InT, OutT]]):
         elif any(k not in schema for k in value):
             # 許可されていないキーがある場合、見つけたものを通知
             extra_keys = [k for k in value if k not in schema]
-            msg = f"'{pn}'に未許可のキーが含まれています: {extra_keys}。"
-            raise KeyError(msg)
+            msg = f"`{pn}`に未許可のキーが含まれています"
+            logger.error(f"{msg}: {extra_keys}")
+            raise KeyError(f"{msg}。")
         return validated_dict
 
 
@@ -231,8 +245,9 @@ class VFloat(VNumerical[float]):
     @override
     def _check_type(self, value: Any) -> None:
         if not isinstance(value, float):
-            msg = f"'{self.public_name}'はfloat型である必要があります。"
-            raise TypeError(msg)
+            msg = f"`{self.public_name}`は`float型`である必要があります"
+            logger.error(f"{msg}: {type(value)}")
+            raise TypeError(f"{msg}。")
 
 
 class VInt(VNumerical[int]):
@@ -248,16 +263,18 @@ class VInt(VNumerical[int]):
     @override
     def _check_type(self, value: Any) -> None:
         if not isinstance(value, int) or isinstance(value, bool):
-            msg = f"'{self.public_name}'はint型(boolを除く)である必要があります。"
-            raise TypeError(msg)
+            msg = f"`{self.public_name}`は`int型`(boolを除く)である必要があります"
+            logger.error(f"{msg}: {type(value)}")
+            raise TypeError(f"{msg}。")
 
 
 class VList[OutT](VSequence[list[Any]]):
     @override
     def validate(self, value: Any) -> list[OutT]:
         if not isinstance(value, list):
-            msg = f"'{self.public_name}'はlist型である必要があります。"
-            raise TypeError(msg)
+            msg = f"`{self.public_name}`は`list型`である必要があります"
+            logger.error(f"{msg}: {type(value)}")
+            raise TypeError(f"{msg}。")
         return self._validate_items(value)
 
 
@@ -267,8 +284,9 @@ class VNone(Validator[None]):
     @override
     def validate(self, value: Any) -> None:
         if value is not None:
-            msg = f"'{self.public_name}'はNoneである必要があります（指定された型: {type(value).__name__}）。"
-            raise TypeError(msg)
+            msg = f"`{self.public_name}`はNoneである必要があります"
+            logger.error(f"{msg}: {type(value)}")
+            raise TypeError(f"{msg}。")
         return
 
 
@@ -299,34 +317,39 @@ class VPath(Validator[Path]):
     def validate(self, value: Any) -> Path:
         pn = self.public_name
         if not isinstance(value, Path):
-            msg = f"'{pn}'はpathlib.Path型である必要があります（指定された型: {type(value).__name__}）。"
-            raise TypeError(msg)
+            msg = f"`{pn}`は`pathlib.Path型`である必要があります"
+            logger.error(f"{msg}: {type(value)}")
+            raise TypeError(f"{msg}。")
         exists = value.exists()
 
         # 1. 存在チェック
         if self.must_exist and not exists:
-            msg = f"'{pn}'のパスが存在しません: {value}。"
-            raise FileNotFoundError(msg)
+            msg = f"`{pn}`のパスは存在しません"
+            logger.error(f"{msg}: {value}")
+            raise FileNotFoundError(f"{msg}。")
         # 2. 種類チェック
         cf = self.check_func
         if cf and exists and not cf(value):
             func_name = getattr(cf, "__name__", "custom check")
-            msg = f"'{pn}'はパス種別検証に失敗しました: {func_name}({value})。"
-            raise ValueError(msg)
+            msg = f"`{pn}`はパス種別検証に失敗しました"
+            logger.error(f"{msg}: {func_name}({value})")
+            raise ValueError(f"{msg}。")
 
         # 3. 拡張子チェック
         exts = self.extensions
         if exts and value.suffix not in exts:
             match len(exts):
                 case 0:
-                    msg = f"'{pn}'に拡張子が指定されていません。"
-                    raise ValueError(msg)
+                    msg = f"`{pn}`に拡張子が指定されていません"
+                    logger.error(f"{msg}: {value}")
+                    raise ValueError(f"{msg}。")
                 case 1:
                     txt_exts = exts[0]
                 case _:
                     txt_exts = "[" + ", ".join(exts) + "]"
-            msg = f"'{pn}'の拡張子は{txt_exts}のいずれかである必要があります（指定された拡張子: {value.suffix!r}）。"
-            raise ValueError(msg)
+            msg = f"`{pn}`の拡張子は{txt_exts}のいずれかである必要があります"
+            logger.error(f"{msg}: {value}")
+            raise ValueError(f"{msg}。")
         return value
 
 
@@ -349,14 +372,17 @@ class VRange[OutT: Comparable](Validator[OutT]):
         pn = self.public_name
         try:
             if (mv := self.min_val) is not None and value < mv:
-                msg = f"'{pn}'は{mv}以上である必要があります。"
-                raise ValueError(msg)
+                msg = f"`{pn}`は`{mv}以上`である必要があります"
+                logger.error(f"{msg}: {value}")
+                raise ValueError(f"{msg}。")
             if (mv := self.max_val) is not None and value > mv:
-                msg = f"'{pn}'は{mv}以下である必要があります。"
-                raise ValueError(msg)
+                msg = f"`{pn}`は`{mv}以下`である必要があります"
+                logger.error(f"{msg}: {value}")
+                raise ValueError(f"{msg}。")
         except TypeError:
-            msg = f"'{pn}'（型: {type(value).__name__}）は比較可能ではありません。"
-            raise TypeError(msg) from None
+            msg = f"`{pn}`は比較可能ではありません"
+            logger.error(f"{msg}: {value!r}")
+            raise TypeError(f"{msg}") from None
         return value
 
 
@@ -382,24 +408,29 @@ class VString(Validator[str]):
         pn = self.public_name
         # 1. 型チェック
         if not isinstance(value, str):
-            msg = f"'{pn}'はstr型である必要があります。"
-            raise TypeError(msg)
+            msg = f"`{pn}`は`str型`である必要があります"
+            logger.error(f"{msg}: {type(value)}")
+            raise TypeError(f"{msg}。")
         # 2. 長さチェック
         length = len(value)
         if (ml := self.min_len) is not None and length < ml:
-            msg = f"'{pn}'の長さは{ml}以上である必要があります。"
-            raise ValueError(msg)
+            msg = f"`{pn}`の長さは`{ml}以上`である必要があります"
+            logger.error(f"{msg}: {value}")
+            raise ValueError(f"{msg}。")
         if (ml := self.max_len) is not None and length > ml:
-            msg = f"'{pn}'の長さは{ml}以下である必要があります。"
-            raise ValueError(msg)
+            msg = f"`{pn}`の長さは`{ml}以下`である必要があります。"
+            logger.error(f"{msg}: {value}")
+            raise ValueError(f"{msg}。")
         # 3. 正規表現チェック
         if (pattern := self.pattern) and not pattern.search(value):
-            msg = f"'{pn}'はパターン'{pattern.pattern}'にマッチしません。"
-            raise ValueError(msg)
+            msg = f"`{pn}`はパターン`{pattern.pattern}`にマッチしません"
+            logger.error(f"{msg}: {value}")
+            raise ValueError(f"{msg}。")
         # 4. カスタムチェッカー
         if (checker := self.checker) and not checker(value):
-            msg = f"'{pn}'はカスタム検証に失敗しました。"
-            raise ValueError(msg)
+            msg = f"`{pn}`はカスタム検証に失敗しました"
+            logger.error(f"{msg}: {value}")
+            raise ValueError(f"{msg}。")
         return value
 
 
@@ -427,8 +458,9 @@ class VTimedelta(Validator[timedelta]):
     @override
     def validate(self, value: Any) -> timedelta:
         if not isinstance(value, timedelta):
-            msg = f"'{self.public_name}'はtimedelta型である必要があります（指定された型: {type(value).__name__}）。"
-            raise TypeError(msg)
+            msg = f"`{self.public_name}`は`timedelta型`である必要があります"
+            logger.error(f"{msg}: {type(value)}")
+            raise TypeError(f"{msg}。")
         return value
 
 
@@ -436,8 +468,9 @@ class VTuple[OutT](VSequence[tuple[OutT, ...]]):
     @override
     def validate(self, value: Any) -> tuple[OutT, ...]:
         if not isinstance(value, tuple):
-            msg = f"'{self.public_name}'はtuple型である必要があります。"
-            raise TypeError(msg)
+            msg = f"`{self.public_name}`は`tuple型`である必要があります"
+            logger.error(f"{msg}: {type(value)}")
+            raise TypeError(f"{msg}。")
         return tuple(self._validate_items(value))
 
 
@@ -459,8 +492,9 @@ class VType[OutT](Validator[OutT]):
             is_valid = isinstance(value, t_type)
             type_name = f"{t_type.__name__}のサブクラス"
         if not is_valid:
-            msg = f"'{self.public_name}'は{type_name}である必要があります（指定された型: {type(value).__name__}）。"
-            raise TypeError(msg)
+            msg = f"'{self.public_name}'は{type_name}である必要があります"
+            logger.error(f"{msg}: {type(value)}")
+            raise TypeError(f"{msg}")
         return value
 
 

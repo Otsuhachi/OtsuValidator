@@ -58,9 +58,9 @@ class TestStudentValidators(unittest.TestCase):
 
     def test_name_validation(self) -> None:
         """name属性の検証"""
-        with self.assertRaisesRegex(TypeError, "str型である必要があります"):
+        with self.assertRaisesRegex(TypeError, "`str型`である必要があります"):
             self.student.name = 28
-        with self.assertRaisesRegex(ValueError, "長さは1以上である必要があります"):
+        with self.assertRaisesRegex(ValueError, "長さは`1以上`である必要があります"):
             self.student.name = ""
         with self.assertRaisesRegex(ValueError, "にマッチしません"):
             self.student.name = "otsuhachi"
@@ -71,18 +71,18 @@ class TestStudentValidators(unittest.TestCase):
 
     def test_age_validation(self) -> None:
         """age属性の検証"""
-        with self.assertRaisesRegex(TypeError, "int型"):
+        with self.assertRaisesRegex(TypeError, "`int型`"):
             self.student.age = 28.8
-        with self.assertRaisesRegex(ValueError, "150以下である必要があります"):
+        with self.assertRaisesRegex(ValueError, "`150以下`である必要があります"):
             self.student.age = 151
-        with self.assertRaisesRegex(ValueError, "0以上である必要があります"):
+        with self.assertRaisesRegex(ValueError, "`0以上`である必要があります"):
             self.student.age = -1
         self.student.age = 28
         self.assertEqual(self.student.age, 28)
 
     def test_gender_validation(self) -> None:
         """gender属性の検証"""
-        with self.assertRaisesRegex(ValueError, "いずれかである必要があります"):
+        with self.assertRaisesRegex(ValueError, "許容された値と一致しません。"):
             self.student.gender = "mal"
         self.student.gender = None
         self.assertEqual(self.student.gender, None)
@@ -98,7 +98,7 @@ class TestStudentValidators(unittest.TestCase):
             "Social Studies": 28,
             "Math": {"Math1": -1, "Math2": 56},
         }
-        with self.assertRaisesRegex(ValueError, r"'grades\['Math'\]\['Math1'\]'は0以上"):
+        with self.assertRaisesRegex(ValueError, r"`grades\['Math'\]\['Math1'\]`は`0以上`"):
             self.student.grades = invalid_grades
         valid_grades = {
             "Japanese": 68,
@@ -110,10 +110,10 @@ class TestStudentValidators(unittest.TestCase):
 
     def test_hobby_validation(self) -> None:
         """hobby属性の検証"""
-        with self.assertRaisesRegex(TypeError, "list型である必要があります"):
+        with self.assertRaisesRegex(TypeError, "`list型`である必要があります"):
             self.student.hobby = 1
         invalid_hobbies = ["PC", ""]
-        with self.assertRaisesRegex(ValueError, "長さは1以上である必要があります"):
+        with self.assertRaisesRegex(ValueError, "長さは`1以上`である必要があります"):
             self.student.hobby = invalid_hobbies
         valid_hobbies = ["PC", "Game"]
         self.student.hobby = valid_hobbies
