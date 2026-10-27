@@ -1,9 +1,16 @@
 import io
+import logging
 import sys
 import unittest
 from typing import Any
 
 from otsuvalidator import VChain, VChoice, VDict, VInt, VList, VNone, VString
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
 
 
 class Student:

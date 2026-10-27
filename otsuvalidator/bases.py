@@ -88,6 +88,7 @@ class VChain[OutT](Validator[OutT]):
     def __init__(self, *validators: Validator[Any], pass_type: Literal["all", "any"] = "any") -> None:
         super().__init__()
         self.validators: tuple[Validator[Any], ...] = validators
+        self.__target_loggers = [logging.getLogger(mn) for mn in {v.__module__ for v in validators}]
         self.pass_type: Literal["all", "any"] = pass_type
 
     def validate(self, value: Any) -> OutT:
@@ -97,18 +98,28 @@ class VChain[OutT](Validator[OutT]):
             for validator in validators:
                 current_value = validator.validate(current_value)
         else:
-            passed = False
-            exceptions = []
-            for validator in validators:
-                try:
-                    tmp = validator.validate(current_value)
-                    current_value = tmp
-                    passed = True
-                except Exception as ex:
-                    exceptions.append(ex)
-            if not passed:
-                logger.error(f"全てのバリデータでの検証に失敗しました: {value}")
-                raise ValueError(*exceptions)
+            # 複数のバリデータのいずれかが通過すればOKなので途中の検証エラーログを無効化する
+            original_levels: dict[logging.Logger, int] = {}
+            for tl in self.__target_loggers:
+                original_levels[tl] = tl.level
+                tl.setLevel(logging.CRITICAL + 1)
+
+            try:
+                passed = False
+                exceptions = []
+                for validator in validators:
+                    try:
+                        tmp = validator.validate(current_value)
+                        current_value = tmp
+                        passed = True
+                    except Exception as ex:
+                        exceptions.append(ex)
+                if not passed:
+                    logger.error(f"全てのバリデータでの検証に失敗しました: {value}")
+                    raise ValueError(*exceptions)
+            finally:
+                for tl, level in original_levels.items():
+                    tl.setLevel(level)
         return current_value
 
     def __or__[NextOutT](self, other: Validator[NextOutT]) -> "VChain[NextOutT]":
